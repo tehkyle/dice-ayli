@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Showrunner</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- Screen 1: Welcome / Show Setup -->
+  <section id="screen-welcome" class="screen active">
+    <div class="screen-inner">
+      <h1 class="app-title">SHOWRUNNER</h1>
+      <div class="show-meta">
+        <div class="meta-date" id="today-date"></div>
+        <div class="meta-perf" id="perf-number"></div>
+      </div>
+      <div id="qlab-status" class="qlab-status">
+        <span id="qlab-dot" class="status-dot checking"></span>
+        <span id="qlab-status-text">Checking QLab…</span>
+      </div>
+      <div id="qlab-missing" class="qlab-missing hidden"></div>
+      <div class="screen-actions">
+        <button id="btn-begin" class="btn btn-primary btn-xl" disabled>Begin Cast Entry</button>
+        <button id="btn-retry-qlab" class="btn btn-secondary hidden">Retry QLab check</button>
+      </div>
+      <div class="history-link"><a href="/history">View show history →</a></div>
+    </div>
+  </section>
+
+  <!-- Screen 1.5: Scene Selection -->
+  <section id="screen-scenes" class="screen">
+    <div class="screen-inner">
+      <button id="btn-back-scenes" class="btn-back">← Back</button>
+      <h2 class="screen-title">Select Scenes</h2>
+      <div id="act-rows" class="act-rows"></div>
+      <div class="screen-actions">
+        <button id="btn-next-cast" class="btn btn-primary btn-xl">Next: Assign Cast →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Screen 2: Cast Assignment -->
+  <section id="screen-cast" class="screen">
+    <div class="screen-inner">
+      <button id="btn-back-cast" class="btn-back">← Back</button>
+      <h2 class="screen-title">Assign Cast</h2>
+      <div id="cast-rows" class="cast-rows"></div>
+      <div id="duplicate-warning" class="warning hidden">An actor is assigned to more than one track. Resolve before continuing.</div>
+      <div class="screen-actions">
+        <button id="btn-randomize" class="btn btn-secondary">Randomize unfilled</button>
+        <button id="btn-review" class="btn btn-primary btn-xl" disabled>Review Cast →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Screen 3: Confirmation -->
+  <section id="screen-confirm" class="screen">
+    <div class="screen-inner">
+      <button id="btn-back-confirm" class="btn-back">← Back</button>
+      <h2 class="screen-title">Confirm Cast</h2>
+      <div id="cast-summary" class="cast-summary"></div>
+      <div id="lock-status" class="lock-status hidden"></div>
+      <div class="screen-actions">
+        <button id="btn-lock" class="btn btn-primary btn-xl">Lock &amp; Send to QLab</button>
+        <button id="btn-new-show" class="btn btn-secondary btn-xl hidden">Start New Show</button>
+      </div>
+    </div>
+  </section>
+
+  <script src="app.js"></script>
+</body>
+</html>
