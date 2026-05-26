@@ -1,3 +1,4 @@
 node_modules/
 .env
 db/showrunner.json
+sheets-config.json

@@ -1,0 +1,61 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write   # needed to create the GitHub Release and upload assets
+
+jobs:
+  build-mac:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: showrunner/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: showrunner
+
+      # Bake OAuth credentials into .env so they're bundled inside the app.
+      # Set GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET as repository
+      # secrets at Settings → Secrets and variables → Actions.
+      - name: Write .env from secrets
+        working-directory: showrunner
+        run: |
+          cat > .env << 'EOF'
+          PORT=3000
+          QLAB_HOST=127.0.0.1
+          QLAB_SEND_PORT=53000
+          QLAB_RECEIVE_PORT=53001
+          GOOGLE_OAUTH_CLIENT_ID=${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
+          GOOGLE_OAUTH_CLIENT_SECRET=${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+          EOF
+
+      # CSC_IDENTITY_AUTO_DISCOVERY=false skips code signing.
+      # Without a Developer ID certificate the app is unsigned — users will need
+      # to right-click → Open on first launch to bypass Gatekeeper.
+      # See GOOGLE_SETUP.md for first-launch instructions to pass on to stage managers.
+      - name: Build Electron app (.dmg)
+        working-directory: showrunner
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: npm run dist
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Showrunner ${{ github.ref_name }}"
+          generate_release_notes: true
+          files: |
+            showrunner/dist/*.dmg

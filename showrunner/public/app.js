@@ -35,6 +35,22 @@ const lockStatusEl    = document.getElementById('lock-status');
 const btnLock         = document.getElementById('btn-lock');
 const btnNewShow      = document.getElementById('btn-new-show');
 
+// Modal refs
+const modalOverlay    = document.getElementById('modal-overlay');
+const modalClose      = document.getElementById('modal-close');
+const modalDisconnected = document.getElementById('modal-state-disconnected');
+const modalConnected  = document.getElementById('modal-state-connected');
+const modalAuthError  = document.getElementById('modal-auth-error');
+const modalEmail      = document.getElementById('modal-account-email');
+const sheetPicker     = document.getElementById('sheet-picker');
+const tabField        = document.getElementById('tab-field');
+const tabPicker       = document.getElementById('tab-picker');
+const btnSaveSheets   = document.getElementById('btn-save-sheets');
+const modalSaveStatus = document.getElementById('modal-save-status');
+const btnDisconnect   = document.getElementById('btn-disconnect');
+const btnSettings     = document.getElementById('btn-settings');
+const settingsBadge   = document.getElementById('settings-badge');
+
 // --- Screen transitions ---
 function showScreen(name) {
   Object.values(screens).forEach(s => s.classList.remove('active'));
@@ -659,5 +675,192 @@ btnNewShow.addEventListener('click', async () => {
   btnBegin.disabled = false;
 });
 
+// --- Google Sheets config modal ---
+
+async function refreshSettingsBadge() {
+  settingsBadge.className = 'settings-badge checking';
+  try {
+    const statusRes = await fetch('/api/auth/google/status');
+    const { connected } = await statusRes.json();
+    if (!connected) {
+      settingsBadge.className = 'settings-badge unconfigured';
+      return;
+    }
+    const cfgRes = await fetch('/api/config/sheets');
+    const cfg = await cfgRes.json();
+    const fullyConfigured = cfg.spreadsheetId && cfg.sheetTabName;
+    settingsBadge.className = `settings-badge ${fullyConfigured ? 'configured' : 'unconfigured'}`;
+  } catch {
+    settingsBadge.className = 'settings-badge unconfigured';
+  }
+}
+
+function openModal() {
+  modalOverlay.classList.remove('hidden');
+  loadModalState();
+}
+
+function closeModal() {
+  modalOverlay.classList.add('hidden');
+}
+
+async function loadModalState() {
+  modalDisconnected.classList.add('hidden');
+  modalConnected.classList.add('hidden');
+  modalAuthError.classList.add('hidden');
+  modalSaveStatus.textContent = '';
+  modalSaveStatus.className = 'modal-save-status';
+
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('auth_error') === '1') {
+    modalAuthError.classList.remove('hidden');
+  }
+
+  let status;
+  try {
+    const res = await fetch('/api/auth/google/status');
+    status = await res.json();
+  } catch {
+    modalDisconnected.classList.remove('hidden');
+    return;
+  }
+
+  if (!status.connected) {
+    modalDisconnected.classList.remove('hidden');
+    return;
+  }
+
+  modalEmail.textContent = status.email || '';
+  modalConnected.classList.remove('hidden');
+
+  let currentCfg = {};
+  try {
+    const cfgRes = await fetch('/api/config/sheets');
+    currentCfg = await cfgRes.json();
+  } catch { /* ignore */ }
+
+  await loadSheetPicker(currentCfg.spreadsheetId || null);
+  if (currentCfg.spreadsheetId && currentCfg.sheetTabName) {
+    await loadTabPicker(currentCfg.spreadsheetId, currentCfg.sheetTabName);
+  }
+  validateSaveButton();
+}
+
+async function loadSheetPicker(selectedId) {
+  sheetPicker.innerHTML = '<option value="">— Loading… —</option>';
+  tabField.classList.add('hidden');
+  tabPicker.innerHTML = '';
+  btnSaveSheets.disabled = true;
+
+  try {
+    const res = await fetch('/api/sheets/list');
+    if (res.status === 401) {
+      sheetPicker.innerHTML = '<option value="">— Auth error, reconnect —</option>';
+      return;
+    }
+    const files = await res.json();
+    sheetPicker.innerHTML = '<option value="">— Select a spreadsheet —</option>';
+    files.forEach(f => {
+      const opt = document.createElement('option');
+      opt.value = f.id;
+      opt.textContent = f.name;
+      if (f.id === selectedId) opt.selected = true;
+      sheetPicker.appendChild(opt);
+    });
+  } catch {
+    sheetPicker.innerHTML = '<option value="">— Failed to load —</option>';
+  }
+}
+
+async function loadTabPicker(spreadsheetId, selectedTab) {
+  tabField.classList.remove('hidden');
+  tabPicker.innerHTML = '<option value="">— Loading tabs… —</option>';
+  btnSaveSheets.disabled = true;
+
+  try {
+    const res = await fetch(`/api/sheets/${spreadsheetId}/tabs`);
+    const tabs = await res.json();
+    tabPicker.innerHTML = '<option value="">— Select tab —</option>';
+    tabs.forEach(name => {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      if (name === selectedTab) opt.selected = true;
+      tabPicker.appendChild(opt);
+    });
+    if (selectedTab) tabPicker.value = selectedTab;
+  } catch {
+    tabPicker.innerHTML = '<option value="">— Failed to load —</option>';
+  }
+  validateSaveButton();
+}
+
+function validateSaveButton() {
+  btnSaveSheets.disabled = !(sheetPicker.value && tabPicker.value);
+}
+
+btnSettings.addEventListener('click', openModal);
+modalClose.addEventListener('click', closeModal);
+modalOverlay.addEventListener('click', (e) => { if (e.target === modalOverlay) closeModal(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+
+sheetPicker.addEventListener('change', async () => {
+  const id = sheetPicker.value;
+  if (!id) {
+    tabField.classList.add('hidden');
+    tabPicker.innerHTML = '';
+    btnSaveSheets.disabled = true;
+    return;
+  }
+  await loadTabPicker(id, null);
+});
+
+tabPicker.addEventListener('change', validateSaveButton);
+
+btnSaveSheets.addEventListener('click', async () => {
+  btnSaveSheets.disabled = true;
+  modalSaveStatus.className = 'modal-save-status';
+  modalSaveStatus.textContent = 'Saving…';
+
+  const spreadsheetId   = sheetPicker.value;
+  const spreadsheetName = sheetPicker.options[sheetPicker.selectedIndex]?.textContent || '';
+  const sheetTabName    = tabPicker.value;
+
+  try {
+    const res = await fetch('/api/config/sheets', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ spreadsheetId, spreadsheetName, sheetTabName }),
+    });
+    if (res.ok) {
+      modalSaveStatus.textContent = 'Saved!';
+      await refreshSettingsBadge();
+      setTimeout(() => { modalSaveStatus.textContent = ''; }, 2500);
+    } else {
+      modalSaveStatus.className = 'modal-save-status error';
+      modalSaveStatus.textContent = 'Save failed.';
+    }
+  } catch {
+    modalSaveStatus.className = 'modal-save-status error';
+    modalSaveStatus.textContent = 'Network error.';
+  }
+  btnSaveSheets.disabled = false;
+});
+
+btnDisconnect.addEventListener('click', async () => {
+  if (!confirm('Disconnect your Google account? Show export will stop working until you reconnect.')) return;
+  await fetch('/api/auth/google', { method: 'DELETE' });
+  await refreshSettingsBadge();
+  loadModalState();
+});
+
 // --- Boot ---
-initWelcomeScreen();
+(async () => {
+  await initWelcomeScreen();
+  await refreshSettingsBadge();
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('sheets_config') === '1') {
+    history.replaceState({}, '', window.location.pathname);
+    openModal();
+  }
+})();

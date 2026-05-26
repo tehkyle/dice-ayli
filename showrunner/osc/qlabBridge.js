@@ -330,6 +330,8 @@ function startReceiver(db, io) {
         const { appendShowToSheet } = require('../integrations/googleSheets');
         const show = db.data.shows.find(s => s.id === showId);
         if (!show) return;
+        show.ended_at = new Date().toISOString();
+        db.write();
         const castAssignments = db.data.cast_assignments.filter(a => a.show_id === showId);
         const scenesPlayed = db.data.scene_log
           .filter(e => e.show_id === showId)

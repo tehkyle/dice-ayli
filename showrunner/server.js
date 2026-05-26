@@ -6,9 +6,11 @@ const path = require('path');
 
 const { getDb } = require('./db/database');
 const { startReceiver } = require('./osc/qlabBridge');
-const showsRouter = require('./routes/shows');
+const showsRouter  = require('./routes/shows');
 const configRouter = require('./routes/config');
-const qlabRouter = require('./routes/qlab');
+const qlabRouter   = require('./routes/qlab');
+const authRouter   = require('./routes/auth');
+const sheetsRouter = require('./routes/sheets');
 
 const PORT = parseInt(process.env.PORT, 10) || 3000;
 
@@ -21,9 +23,11 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/history', (_req, res) => res.sendFile(path.join(__dirname, 'public/history.html')));
 
-app.use('/api/shows', showsRouter);
+app.use('/api/shows',  showsRouter);
 app.use('/api/config', configRouter);
-app.use('/api/qlab', qlabRouter);
+app.use('/api/qlab',   qlabRouter);
+app.use('/api/auth',   authRouter);
+app.use('/api/sheets', sheetsRouter);
 
 // Initialize DB on startup
 const db = getDb();

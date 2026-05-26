@@ -80,7 +80,7 @@ router.delete('/:id', (req, res) => {
   res.json({ success: true });
 });
 
-// GET /api/shows — all shows with cast
+// GET /api/shows — all shows with cast and scene log
 // performance_number is the show's 1-based position when sorted by id
 router.get('/', (req, res) => {
   const db = getDb();
@@ -89,6 +89,9 @@ router.get('/', (req, res) => {
     ...show,
     performance_number: i + 1,
     cast: db.data.cast_assignments.filter(a => a.show_id === show.id),
+    scenes_played: db.data.scene_log
+      .filter(e => e.show_id === show.id)
+      .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)),
   })).reverse();
   res.json(result);
 });
@@ -104,6 +107,9 @@ router.get('/today', (req, res) => {
     .map(show => ({
       ...show,
       cast: db.data.cast_assignments.filter(a => a.show_id === show.id),
+      scenes_played: db.data.scene_log
+        .filter(e => e.show_id === show.id)
+        .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)),
     }));
   res.json(result);
 });

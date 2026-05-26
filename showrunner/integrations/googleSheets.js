@@ -1,8 +1,7 @@
 const fs   = require('fs');
 const path = require('path');
 
-// Lazily required so the server starts fine even without googleapis installed
-// or credentials configured. All errors are caught and logged, never thrown.
+const { getTokens, saveTokens, readSheetsConfig } = require('./sheetsConfig');
 
 function loadConfig() {
   return JSON.parse(fs.readFileSync(path.join(__dirname, '../config.json'), 'utf8'));
@@ -12,42 +11,56 @@ function timestamp() {
   return new Date().toISOString();
 }
 
+function buildAuth() {
+  const tokens = getTokens();
+  if (!tokens) throw new Error('[Sheets] No OAuth tokens — connect Google account via the config modal');
+
+  const { google } = require('googleapis');
+  const oauth2Client = new google.auth.OAuth2(
+    process.env.GOOGLE_OAUTH_CLIENT_ID,
+    process.env.GOOGLE_OAUTH_CLIENT_SECRET,
+    'urn:ietf:wg:oauth:2.0:oob'
+  );
+  oauth2Client.setCredentials(tokens);
+  oauth2Client.on('tokens', (newTokens) => {
+    saveTokens({ ...tokens, ...newTokens });
+    console.log(`[Sheets] ${timestamp()} Tokens refreshed and persisted`);
+  });
+  return oauth2Client;
+}
+
 /**
  * Append one row to the configured Google Sheet for a completed show.
  *
  * Row format:
- *   Date | Perf # | Lock Time | <one col per track in config order> | <one col per act: scenes played in order>
+ *   Date | Perf # | Start | Run Time | <one col per track in config order> | <one col per act: scenes played in order>
  *
- * Required env vars:
- *   GOOGLE_SPREADSHEET_ID          — the spreadsheet ID from the URL
- *   GOOGLE_SERVICE_ACCOUNT_KEY_FILE — path to the downloaded service account JSON key
- *
- * Setup (one-time):
- *   1. Google Cloud Console → enable Google Sheets API
- *   2. Create service account → download JSON key
- *   3. Share the spreadsheet with the service account email (Editor)
- *   4. Set the env vars above in .env
+ * Configure spreadsheet and tab via the Google Sheets gear icon in the UI.
  *
  * @param {Object}   show             — show record from DB
  * @param {Object[]} castAssignments  — [{ character_track, actor_name }]
  * @param {Object[]} scenesPlayed     — [{ scene_name, timestamp }] sorted by time
  */
 async function appendShowToSheet(show, castAssignments, scenesPlayed) {
-  const spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID;
-  const keyFile       = process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE;
+  let auth;
+  try {
+    auth = buildAuth();
+  } catch (err) {
+    console.warn(err.message);
+    return;
+  }
 
-  if (!spreadsheetId || !keyFile) {
-    console.warn('[Sheets] GOOGLE_SPREADSHEET_ID or GOOGLE_SERVICE_ACCOUNT_KEY_FILE not set — skipping export');
+  const sheetsConfig  = readSheetsConfig();
+  const spreadsheetId = sheetsConfig.spreadsheetId;
+  const sheetTabName  = sheetsConfig.sheetTabName || 'Sheet1';
+
+  if (!spreadsheetId) {
+    console.warn('[Sheets] No spreadsheetId configured — skipping export. Select a spreadsheet in the config modal.');
     return;
   }
 
   const { google } = require('googleapis');
   const config = loadConfig();
-
-  const auth = new google.auth.GoogleAuth({
-    keyFile: path.resolve(keyFile),
-    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-  });
   const sheets = google.sheets({ version: 'v4', auth });
 
   // Build cast columns in config track order
@@ -59,33 +72,41 @@ async function appendShowToSheet(show, castAssignments, scenesPlayed) {
   const actIds = (config.acts || []).map(a => a.id);
   const actSceneColumns = actIds.map(actId => {
     const actScenes = scenesPlayed.filter(e => {
-      // Match scenes belonging to this act by the act's scene list
       const act = (config.acts || []).find(a => a.id === actId);
       return act && act.scenes.includes(e.scene_name);
     });
     return actScenes.map(e => e.scene_name).join(' → ');
   });
 
-  const lockTime = show.locked_at
+  const startTime = show.locked_at
     ? new Date(show.locked_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
     : '';
+
+  let runTime = '';
+  if (show.locked_at && show.ended_at) {
+    const totalMins = Math.round((new Date(show.ended_at) - new Date(show.locked_at)) / 60000);
+    const h = Math.floor(totalMins / 60);
+    const m = totalMins % 60;
+    runTime = `${h}:${String(m).padStart(2, '0')}`;
+  }
 
   const row = [
     show.show_date,
     show.performance_number,
-    lockTime,
+    startTime,
+    runTime,
     ...castColumns,
     ...actSceneColumns,
   ];
 
-  console.log(`[Sheets] ${timestamp()} Appending row for show ${show.id}: ${row.join(' | ')}`);
+  console.log(`[Sheets] ${timestamp()} Appending row for show ${show.id} to "${sheetTabName}": ${row.join(' | ')}`);
 
   await sheets.spreadsheets.values.append({
     spreadsheetId,
-    range: 'Sheet1!A1',
+    range:            `${sheetTabName}!A1`,
     valueInputOption: 'USER_ENTERED',
     insertDataOption: 'INSERT_ROWS',
-    requestBody: { values: [row] },
+    requestBody:      { values: [row] },
   });
 
   console.log(`[Sheets] ${timestamp()} Row appended successfully`);

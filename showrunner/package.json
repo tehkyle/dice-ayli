@@ -2,17 +2,45 @@
   "name": "showrunner",
   "version": "1.0.0",
   "description": "Cast management and QLab OSC bridge for interactive theatre",
-  "main": "server.js",
+  "main": "electron-main.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js"
+    "start":    "node server.js",
+    "dev":      "node --watch server.js",
+    "electron": "electron .",
+    "dist":     "electron-builder --mac --publish never"
   },
   "dependencies": {
-    "dotenv": "^16.4.5",
-    "express": "^4.19.2",
+    "dotenv":     "^16.4.5",
+    "express":    "^4.19.2",
     "googleapis": "^144.0.0",
-    "lowdb": "^7.0.1",
-    "node-osc": "^9.1.0",
-    "socket.io": "^4.7.5"
+    "lowdb":      "^7.0.1",
+    "node-osc":   "^9.1.0",
+    "socket.io":  "^4.7.5"
+  },
+  "devDependencies": {
+    "electron":         "^33.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId":       "com.ayli.showrunner",
+    "productName": "Showrunner",
+    "asar":        false,
+    "mac": {
+      "target": [
+        { "target": "dmg", "arch": ["universal"] }
+      ],
+      "category": "public.app-category.productivity",
+      "identity": null
+    },
+    "files": [
+      "**/*",
+      "!dist/**",
+      "!**/*.md",
+      "!node_modules/.cache/**",
+      "!.git/**"
+    ],
+    "directories": {
+      "output": "dist"
+    }
   }
 }

@@ -1,5 +1,6 @@
 let allActors = [];
 let allTracks = [];
+let allActs   = [];
 
 async function load() {
   const root = document.getElementById('history-root');
@@ -17,6 +18,7 @@ async function load() {
 
   allActors = [...config.actors].sort((a, b) => a.name.localeCompare(b.name));
   allTracks = config.characterTracks;
+  allActs   = config.acts || [];
 
   if (!shows.length) {
     root.innerHTML = '<div class="history-empty">No shows recorded yet.</div>';
@@ -78,7 +80,13 @@ function renderCard(card, show, trackMap, actorMap, editMode) {
 
   const timeLabel = document.createElement('div');
   timeLabel.className = 'history-card-time';
-  timeLabel.textContent = show.locked_at ? formatTime(show.locked_at) : 'Not locked';
+  if (show.locked_at) {
+    const startStr = formatTime(show.locked_at);
+    const runStr   = show.ended_at ? formatRunTime(show.locked_at, show.ended_at) : null;
+    timeLabel.textContent = runStr ? `${startStr}  ·  ${runStr}` : startStr;
+  } else {
+    timeLabel.textContent = 'Not locked';
+  }
 
   header.appendChild(perfLabel);
   header.appendChild(timeLabel);
@@ -159,6 +167,35 @@ function renderCard(card, show, trackMap, actorMap, editMode) {
   }
 
   card.appendChild(castList);
+
+  // Scenes section — one row per act showing actual play order
+  const scenesPlayed = show.scenes_played || [];
+  if (scenesPlayed.length > 0 && allActs.length > 0) {
+    const scenesSection = document.createElement('div');
+    scenesSection.className = 'history-scenes-section';
+
+    for (const act of allActs) {
+      const actScenes = scenesPlayed.filter(e => act.scenes.includes(e.scene_name));
+      if (actScenes.length === 0) continue;
+
+      const row = document.createElement('div');
+      row.className = 'history-act-row';
+
+      const label = document.createElement('span');
+      label.className = 'history-act-label';
+      label.textContent = act.label;
+
+      const seq = document.createElement('span');
+      seq.className = 'history-scene-sequence';
+      seq.textContent = actScenes.map(e => e.scene_name).join(' → ');
+
+      row.appendChild(label);
+      row.appendChild(seq);
+      scenesSection.appendChild(row);
+    }
+
+    if (scenesSection.children.length > 0) card.appendChild(scenesSection);
+  }
 
   // Action bar
   if (editMode) {
@@ -280,6 +317,13 @@ function formatDate(dateStr) {
 function formatTime(isoStr) {
   const d = new Date(isoStr);
   return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
+function formatRunTime(startIso, endIso) {
+  const totalMins = Math.round((new Date(endIso) - new Date(startIso)) / 60000);
+  const h = Math.floor(totalMins / 60);
+  const m = totalMins % 60;
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
 load();
