@@ -1,0 +1,138 @@
+<script>
+  import { formatTime, formatRunTime, actorImageUrl } from '../lib/format.js';
+  import { api } from '../lib/api.js';
+
+  let { show, tracks, actors, acts, ondeleted } = $props();
+
+  const actorMap = $derived(Object.fromEntries(actors.map(a => [a.name, a])));
+
+  let editMode = $state(false);
+  let deleteConfirm = $state(false);
+  let editCast = $state({});
+  let saving = $state(false);
+  let saveError = $state('');
+
+  function startEdit() {
+    const castByTrack = Object.fromEntries((show.cast || []).map(a => [a.character_track, a.actor_name]));
+    editCast = Object.fromEntries(tracks.map(t => [t.id, castByTrack[t.id] || '']));
+    editMode = true;
+    deleteConfirm = false;
+    saveError = '';
+  }
+
+  function cancelEdit() {
+    editMode = false;
+    deleteConfirm = false;
+    saveError = '';
+  }
+
+  async function saveEdit() {
+    saving = true;
+    saveError = '';
+    try {
+      await api.saveCast(show.id, editCast);
+      show = {
+        ...show,
+        cast: Object.entries(editCast).map(([character_track, actor_name]) => ({ character_track, actor_name })),
+      };
+      editMode = false;
+    } catch {
+      saveError = 'Failed to save. Check server connection.';
+    }
+    saving = false;
+  }
+
+  async function confirmDelete() {
+    try {
+      await api.deleteShow(show.id);
+      ondeleted(show.id);
+    } catch {
+      saveError = 'Failed to delete.';
+      deleteConfirm = false;
+    }
+  }
+
+  const castByTrack = $derived(Object.fromEntries((show.cast || []).map(a => [a.character_track, a.actor_name])));
+  const headerTime = $derived(() => {
+    if (!show.locked_at) return 'Not locked';
+    const start = formatTime(show.locked_at);
+    const run = show.ended_at ? formatRunTime(show.locked_at, show.ended_at) : null;
+    return run ? `${start}  ·  ${run}` : start;
+  });
+</script>
+
+<div class="history-card">
+  <div class="history-card-header">
+    <div class="history-card-perf">Performance #{show.performance_number}</div>
+    <div class="history-card-time">{headerTime()}</div>
+  </div>
+
+  <div class="history-cast-list">
+    {#each tracks as track}
+      {@const actorName = castByTrack[track.id]}
+      {@const actor = actorName ? actorMap[actorName] : null}
+      <div class="history-cast-row">
+        <div class="history-track-label">
+          {track.label}
+          {#if track.subtitle}<span class="history-track-sub">{track.subtitle}</span>{/if}
+        </div>
+
+        {#if editMode}
+          <select class="history-edit-select" bind:value={editCast[track.id]}>
+            <option value="">— unassigned —</option>
+            {#each actors as a}
+              <option value={a.name}>{a.name}</option>
+            {/each}
+          </select>
+        {:else}
+          <div class="history-actor">
+            {#if actor?.image}
+              <img class="history-actor-img" src={actorImageUrl(actor.image)} alt={actorName} />
+            {:else if actorName}
+              <div class="history-actor-initial">{actorName[0].toUpperCase()}</div>
+            {/if}
+            <div class="history-actor-name">{actorName || '—'}</div>
+          </div>
+        {/if}
+      </div>
+    {/each}
+  </div>
+
+  {#if (show.scenes_played || []).length > 0 && acts.length > 0}
+    <div class="history-scenes-section">
+      {#each acts as act}
+        {@const actScenes = (show.scenes_played || []).filter(e => act.scenes.includes(e.scene_name))}
+        {#if actScenes.length > 0}
+          <div class="history-act-row">
+            <span class="history-act-label">{act.label}</span>
+            <span class="history-scene-sequence">{actScenes.map(e => e.scene_name).join(' → ')}</span>
+          </div>
+        {/if}
+      {/each}
+    </div>
+  {/if}
+
+  {#if saveError}
+    <div class="history-save-error">{saveError}</div>
+  {/if}
+
+  {#if deleteConfirm}
+    <div class="history-delete-confirm">
+      <span>Delete this show permanently?</span>
+      <button class="btn-history danger" onclick={confirmDelete}>Yes, delete</button>
+      <button class="btn-history" onclick={cancelEdit}>Cancel</button>
+    </div>
+  {:else if editMode}
+    <div class="history-card-actions">
+      <button class="btn-history primary" disabled={saving} onclick={saveEdit}>
+        {saving ? 'Saving…' : 'Save'}
+      </button>
+      <button class="btn-history" onclick={cancelEdit}>Cancel</button>
+    </div>
+  {:else}
+    <div class="history-card-actions">
+      <button class="btn-history" onclick={startEdit}>Edit cast</button>
+      <button class="btn-history danger" onclick={() => { deleteConfirm = true; }}>Delete show</button>
+    </div>
+  {/if}
+</div>

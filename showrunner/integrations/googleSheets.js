@@ -96,7 +96,6 @@ async function appendShowToSheet(show, performanceNumber, castAssignments, scene
     : '';
 
   const row = [
-    performanceNumber,
     showDate ? `'${showDate}` : '',
     startTime,
     runTime,
@@ -113,7 +112,7 @@ async function appendShowToSheet(show, performanceNumber, castAssignments, scene
   if (!hasHeader) {
     const trackHeaders = (config.characterTracks || []).map(t => t.label);
     const actHeaders   = (config.acts || []).map(a => a.label);
-    const headerRow = ['Perf #', 'Date', 'Start Time', 'Run Time', ...trackHeaders, ...actHeaders];
+    const headerRow = ['Date', 'Start Time', 'Run Time', ...trackHeaders, ...actHeaders];
     await sheets.spreadsheets.values.update({
       spreadsheetId,
       range:            `${sheetTabName}!A1`,

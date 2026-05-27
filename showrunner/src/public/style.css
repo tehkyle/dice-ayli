@@ -30,6 +30,13 @@ html, body {
   line-height: 1.4;
 }
 
+#app {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .screen {
   display: none;
   min-height: 100vh;
