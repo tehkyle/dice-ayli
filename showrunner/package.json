@@ -9,6 +9,7 @@
     "build": "vite build",
     "electron": "npm run build && electron .",
     "dist": "npm run build && electron-builder --mac --publish never",
+    "dist-dmg": "npm run build && electron-builder --mac dmg --publish never && hdiutil convert dist/Dacha-Dice-AYLI-mac.dmg -format UDRW -o dist/staging.dmg && hdiutil attach dist/staging.dmg -mountpoint /Volumes/Dacha-Dice-AYLI -noverify -noautoopen && codesign --force --deep --sign - \"/Volumes/Dacha-Dice-AYLI/Dacha-Dice-AYLI.app\" && hdiutil detach /Volumes/Dacha-Dice-AYLI && rm dist/Dacha-Dice-AYLI-mac.dmg && hdiutil convert dist/staging.dmg -format UDZO -o dist/Dacha-Dice-AYLI-mac.dmg && rm dist/staging.dmg && open dist/",
     "build-local": "npm run build && electron-builder --mac dir --publish never && codesign --force --deep --sign - dist/mac-arm64/Dacha-Dice-AYLI.app && open dist/mac-arm64/Dacha-Dice-AYLI.app",
     "release": "bash scripts/release.sh"
   },
