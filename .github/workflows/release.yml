@@ -52,6 +52,14 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         run: npm run dist
 
+      # Zip the QLab show folder (excludes backup files, DS_Store, Icon).
+      - name: Zip QLab show files
+        run: |
+          zip -r qlab-show-files.zip qlab/ \
+            -x "*backup*" \
+            -x "*/.DS_Store" \
+            -x "*/Icon"
+
       - name: Create GitHub Release
         id: release
         uses: softprops/action-gh-release@v2
@@ -60,22 +68,26 @@ jobs:
           generate_release_notes: true
           files: |
             showrunner/dist/*.dmg
+            qlab-show-files.zip
 
-      # Write version + download URL into the static site so the download
-      # button works without needing an authenticated GitHub API call.
+      # Write version + download URLs into the static site so buttons work
+      # without needing an authenticated GitHub API call.
       - name: Update site/latest.json
         run: |
-          DMG_URL=$(echo '${{ steps.release.outputs.assets }}' \
-            | node -p "JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')).find(a=>a.name.endsWith('.dmg')).browser_download_url")
-          node -e "
-            const fs = require('fs');
-            fs.writeFileSync('site/latest.json', JSON.stringify({
-              version: '${{ github.ref_name }}',
-              url: process.env.DMG_URL
-            }, null, 2));
-          " DMG_URL="$DMG_URL"
+          echo '${{ steps.release.outputs.assets }}' > /tmp/assets.json
+          node << 'EOF'
+          const fs = require('fs');
+          const assets = JSON.parse(fs.readFileSync('/tmp/assets.json', 'utf8'));
+          const dmg  = assets.find(a => a.name.endsWith('.dmg'));
+          const zip  = assets.find(a => a.name === 'qlab-show-files.zip');
+          fs.writeFileSync('site/latest.json', JSON.stringify({
+            version: '${{ github.ref_name }}',
+            url:     dmg ? dmg.browser_download_url : null,
+            qlabUrl: zip ? zip.browser_download_url : null,
+          }, null, 2));
+          EOF
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add site/latest.json
-          git commit -m "release: update download link to ${{ github.ref_name }}"
+          git commit -m "release: update download links to ${{ github.ref_name }}"
           git push origin HEAD:main
