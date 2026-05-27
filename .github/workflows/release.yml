@@ -46,27 +46,14 @@ jobs:
         working-directory: showrunner
         run: npm run build
 
-      # Build the DMG using electron-builder (handles window layout, arrow, icon positions).
-      # Signing is disabled — we ad-hoc sign the .app inside the DMG in the next step.
-      - name: Build DMG (unsigned)
+      # electron-builder runs scripts/afterPack.js between packing the .app and sealing
+      # the DMG — that hook ad-hoc signs the app on the local filesystem where codesign
+      # works reliably, before the DMG is created.
+      - name: Build and sign DMG
         working-directory: showrunner
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         run: npx electron-builder --mac dmg --publish never
-
-      # Mount the DMG as read-write, ad-hoc sign the .app inside so macOS shows
-      # "unidentified developer" (bypassable via right-click → Open) instead of
-      # "damaged" (not bypassable), then reseal as a compressed read-only DMG.
-      - name: Ad-hoc sign app inside DMG
-        working-directory: showrunner
-        run: |
-          hdiutil convert dist/Dacha-Dice-AYLI-mac.dmg -format UDRW -o dist/staging.dmg
-          hdiutil attach dist/staging.dmg -mountpoint /Volumes/Dacha-Dice-AYLI -noverify -noautoopen
-          codesign --force --deep --sign - "/Volumes/Dacha-Dice-AYLI/Dacha-Dice-AYLI.app"
-          hdiutil detach /Volumes/Dacha-Dice-AYLI
-          rm dist/Dacha-Dice-AYLI-mac.dmg
-          hdiutil convert dist/staging.dmg -format UDZO -o dist/Dacha-Dice-AYLI-mac.dmg
-          rm dist/staging.dmg
 
       # Zip the QLab show folder (excludes backup files, DS_Store, Icon).
       - name: Zip QLab show files
