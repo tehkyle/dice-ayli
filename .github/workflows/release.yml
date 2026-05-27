@@ -55,15 +55,20 @@ jobs:
 
       # Ad-hoc sign the .app bundle so macOS shows "unidentified developer"
       # (bypassable via right-click → Open) instead of "damaged" (not bypassable).
+      # Stage the app + an Applications symlink so the DMG shows the drag-to-install UI.
       - name: Ad-hoc sign and package DMG
         working-directory: showrunner
         run: |
           codesign --force --deep --sign - "dist/mac-arm64/Dacha-Dice-AYLI.app"
+          mkdir -p dmg-staging
+          cp -R "dist/mac-arm64/Dacha-Dice-AYLI.app" dmg-staging/
+          ln -s /Applications dmg-staging/Applications
           hdiutil create \
             -volname "Dacha-Dice-AYLI" \
-            -srcfolder "dist/mac-arm64/Dacha-Dice-AYLI.app" \
+            -srcfolder dmg-staging \
             -ov -format UDZO \
             "dist/Dacha-Dice-AYLI-mac.dmg"
+          rm -rf dmg-staging
 
       # Zip the QLab show folder (excludes backup files, DS_Store, Icon).
       - name: Zip QLab show files
