@@ -11,7 +11,7 @@ echo "Releasing v$VERSION..."
 git add -A
 
 git commit -m "v$VERSION"
-git tag "v$VERSION"
+git tag -a "v$VERSION" -m "v$VERSION"
 git push origin main --follow-tags
 
 echo "✓ v$VERSION pushed — github.com/tehkyle/dice-ayli/actions"
