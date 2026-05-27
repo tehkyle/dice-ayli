@@ -75,19 +75,19 @@ jobs:
       - name: Update site/latest.json
         run: |
           echo '${{ steps.release.outputs.assets }}' > /tmp/assets.json
-          node << 'EOF'
-          const fs = require('fs');
-          const assets = JSON.parse(fs.readFileSync('/tmp/assets.json', 'utf8'));
-          const dmg  = assets.find(a => a.name.endsWith('.dmg'));
-          const zip  = assets.find(a => a.name === 'qlab-show-files.zip');
-          fs.writeFileSync('site/latest.json', JSON.stringify({
-            version: '${{ github.ref_name }}',
-            url:     dmg ? dmg.browser_download_url : null,
-            qlabUrl: zip ? zip.browser_download_url : null,
-          }, null, 2));
-          EOF
+          DMG_URL=$(jq -r '[.[] | select(.name | endswith(".dmg"))][0].browser_download_url // ""' /tmp/assets.json)
+          QLAB_URL=$(jq -r '[.[] | select(.name == "qlab-show-files.zip")][0].browser_download_url // ""' /tmp/assets.json)
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git checkout main
+          git pull --rebase origin main
+          jq -n \
+            --arg version "${{ github.ref_name }}" \
+            --arg url "$DMG_URL" \
+            --arg qlabUrl "$QLAB_URL" \
+            '{version: $version, url: (if $url == "" then null else $url end), qlabUrl: (if $qlabUrl == "" then null else $qlabUrl end)}' \
+            > site/latest.json
           git add site/latest.json
           git commit -m "release: update download links to ${{ github.ref_name }}"
-          git push origin HEAD:main
+          git push origin main
