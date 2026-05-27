@@ -42,15 +42,24 @@ jobs:
           GOOGLE_OAUTH_CLIENT_SECRET=${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
           EOF
 
-      # Ad-hoc signed (identity: "-") — no Developer ID certificate needed.
-      # macOS will show "unidentified developer" on first launch; users right-click → Open.
-      # CSC_IDENTITY_AUTO_DISCOVERY=false prevents electron-builder from scanning the
-      # runner's keychain for a real certificate (there isn't one).
-      - name: Build Electron app (.dmg)
+      # Build the unpacked .app first (no DMG yet, no signing by electron-builder).
+      - name: Build Electron app (unpacked)
         working-directory: showrunner
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-        run: npm run dist
+        run: npx electron-builder --mac dir --publish never
+
+      # Ad-hoc sign the .app bundle so macOS shows "unidentified developer"
+      # (bypassable via right-click → Open) instead of "damaged" (not bypassable).
+      - name: Ad-hoc sign and package DMG
+        working-directory: showrunner
+        run: |
+          codesign --force --deep --sign - "dist/mac-arm64/Dacha-Dice-AYLI.app"
+          hdiutil create \
+            -volname "Dacha-Dice-AYLI" \
+            -srcfolder "dist/mac-arm64/Dacha-Dice-AYLI.app" \
+            -ov -format UDZO \
+            "dist/Dacha-Dice-AYLI-mac.dmg"
 
       # Zip the QLab show folder (excludes backup files, DS_Store, Icon).
       - name: Zip QLab show files
