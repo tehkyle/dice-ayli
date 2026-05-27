@@ -7,7 +7,8 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "electron": "electron .",
-    "dist": "electron-builder --mac --publish never"
+    "dist":    "electron-builder --mac --publish never",
+    "release": "bash scripts/release.sh"
   },
   "dependencies": {
     "dotenv": "^16.4.5",
