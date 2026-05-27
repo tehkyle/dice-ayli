@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dacha DICE: AYLI</title>
+  <link rel="icon" type="image/png" href="/images/logo.png" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -29,7 +30,8 @@
           <span id="settings-badge" class="settings-badge checking"></span>
         </button>
       </div>
-      <h1 class="app-title">SHOWRUNNER</h1>
+      <img src="/images/logo.png" alt="Dacha logo" class="app-logo" />
+      <h1 class="app-title">Dacha DICE: AYLI</h1>
       <div class="show-meta">
         <div class="meta-date" id="today-date"></div>
         <div class="meta-perf" id="perf-number"></div>
@@ -89,9 +91,24 @@
 
   <!-- Screen 4: Show In Progress -->
   <section id="screen-progress" class="screen">
-    <div class="screen-inner">
+    <div class="screen-inner" x-data="progressScreen()">
       <h2 class="screen-title">Show In Progress</h2>
       <div id="progress-meta" class="progress-meta"></div>
+
+      <!-- Playhead + Go (Alpine-managed) -->
+      <div class="progress-go-panel">
+        <div class="progress-next-cue">
+          <span class="progress-next-label">Next</span>
+          <span class="progress-next-value" x-text="nextCueDisplay">—</span>
+        </div>
+        <button
+          class="btn btn-primary btn-go"
+          :disabled="going"
+          @click="go()"
+          x-text="going ? 'Sending…' : 'GO'"
+        ></button>
+      </div>
+
       <div class="progress-section-label">Scenes Played</div>
       <div id="progress-scene-list" class="progress-scene-list">
         <div class="progress-empty">Waiting for first scene…</div>
@@ -163,6 +180,7 @@
     </div>
   </div>
 
+  <script src="/alpine.js" defer></script>
   <script src="/socket.io/socket.io.js"></script>
   <script src="app.js"></script>
 </body>

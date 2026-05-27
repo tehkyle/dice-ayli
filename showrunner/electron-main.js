@@ -65,7 +65,6 @@ function waitForServer(onReady, attemptsLeft = 40) {
 function createWindow() {
   mainWindow = new BrowserWindow({
     width:  1024,
-    height: 768,
     title:  'Dacha DICE: AYLI',
     webPreferences: {
       nodeIntegration: false,
@@ -73,6 +72,7 @@ function createWindow() {
     },
   });
 
+  mainWindow.maximize();
   mainWindow.loadURL(`http://localhost:${PORT}`);
   mainWindow.on('closed', () => { mainWindow = null; });
 }

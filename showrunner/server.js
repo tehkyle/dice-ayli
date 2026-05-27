@@ -19,6 +19,7 @@ const httpServer = http.createServer(app);
 const io = new SocketIO(httpServer);
 
 app.use(express.json());
+app.get('/alpine.js', (_req, res) => res.sendFile(require.resolve('alpinejs/dist/cdn.min.js')));
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/history', (_req, res) => res.sendFile(path.join(__dirname, 'public/history.html')));

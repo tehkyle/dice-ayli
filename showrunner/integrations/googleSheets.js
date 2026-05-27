@@ -91,9 +91,13 @@ async function appendShowToSheet(show, performanceNumber, castAssignments, scene
     runTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   }
 
+  const showDate = show.show_date
+    ? new Date(show.show_date + 'T12:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+    : '';
+
   const row = [
     performanceNumber,
-    show.show_date,
+    showDate ? `'${showDate}` : '',
     startTime,
     runTime,
     ...castColumns,

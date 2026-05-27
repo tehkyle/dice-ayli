@@ -69,6 +69,7 @@ const settingsBadge   = document.getElementById('settings-badge');
 function showScreen(name) {
   Object.values(screens).forEach(s => s.classList.remove('active'));
   screens[name].classList.add('active');
+  document.dispatchEvent(new CustomEvent('screen-changed', { detail: { screen: name } }));
 }
 
 // --- Utilities ---
@@ -133,6 +134,10 @@ function getActorByName(name) {
 
 // --- Screen 1: Welcome ---
 async function initWelcomeScreen() {
+  // Prime macOS Automation permission for QLab immediately on welcome screen.
+  // Result is discarded — this just ensures the system dialog fires here, not mid-show.
+  fetch('/api/qlab/playhead').catch(() => {});
+
   const today = new Date().toISOString().slice(0, 10);
   todayDateEl.textContent = formatDate(today);
 
@@ -1004,6 +1009,58 @@ btnDisconnect.addEventListener('click', async () => {
   await refreshSettingsBadge();
   loadModalState();
 });
+
+// --- Alpine component: progress screen Go panel ---
+function progressScreen() {
+  return {
+    nextCueName:   '',
+    nextCueNumber: '',
+    going:         false,
+    pollTimer:     null,
+
+    get nextCueDisplay() {
+      if (!this.nextCueName && !this.nextCueNumber) return '—';
+      return this.nextCueNumber
+        ? `${this.nextCueNumber} — ${this.nextCueName}`
+        : this.nextCueName;
+    },
+
+    init() {
+      document.addEventListener('screen-changed', (e) => {
+        if (e.detail.screen === 'progress') this.startPolling();
+        else                                this.stopPolling();
+      });
+    },
+
+    startPolling() {
+      this.fetchPlayhead();
+      this.pollTimer = setInterval(() => this.fetchPlayhead(), 2000);
+    },
+
+    stopPolling() {
+      clearInterval(this.pollTimer);
+      this.pollTimer = null;
+    },
+
+    async fetchPlayhead() {
+      try {
+        const res = await fetch('/api/qlab/playhead');
+        const { cueName, cueNumber } = await res.json();
+        this.nextCueName   = cueName   || '';
+        this.nextCueNumber = cueNumber || '';
+      } catch {}
+    },
+
+    async go() {
+      this.going = true;
+      try {
+        await fetch('/api/qlab/go', { method: 'POST' });
+      } catch {}
+      await this.fetchPlayhead();
+      setTimeout(() => { this.going = false; }, 800);
+    },
+  };
+}
 
 // --- Boot ---
 (async () => {

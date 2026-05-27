@@ -12,6 +12,7 @@
     "release": "bash scripts/release.sh"
   },
   "dependencies": {
+    "alpinejs": "^3.14.0",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "googleapis": "^144.0.0",
@@ -27,6 +28,7 @@
     "productName": "Dacha-Dice-AYLI",
     "asar": false,
     "mac": {
+      "icon": "build/icon.icns",
       "target": [
         {
           "target": "dmg",

@@ -5,14 +5,14 @@
 }
 
 :root {
-  --bg: #0d0d0d;
-  --surface: #1a1a1a;
-  --surface-2: #242424;
-  --border: #333;
-  --text: #f0f0f0;
-  --text-dim: #888;
-  --accent: #e8c44a;
-  --accent-hover: #f0d060;
+  --bg: #0c0f14;
+  --surface: #161d28;
+  --surface-2: #1e2737;
+  --border: #2d3a4d;
+  --text: #e8edf5;
+  --text-dim: #7a90aa;
+  --accent: #5aa8e0;
+  --accent-hover: #79c2f7;
   --danger: #e05050;
   --danger-bg: #2a1010;
   --success: #4aab6d;
@@ -51,6 +51,14 @@ html, body {
 }
 
 /* Screen 1 */
+.app-logo {
+  display: block;
+  width: 80px;
+  height: 80px;
+  margin: 0 auto 8px;
+  opacity: 0.85;
+}
+
 .app-title {
   font-size: 3rem;
   font-weight: 800;
@@ -1102,6 +1110,62 @@ body.history-page {
 
 .modal-save-status.error {
   color: var(--danger);
+}
+
+/* ── Go panel ─────────────────────────────────────────────────────── */
+
+.progress-go-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.progress-next-cue {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 20px;
+}
+
+.progress-next-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  flex-shrink: 0;
+}
+
+.progress-next-value {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.btn-go {
+  font-size: 2rem;
+  font-weight: 900;
+  letter-spacing: 0.2em;
+  padding: 28px;
+  border-radius: 10px;
+  width: 100%;
+  transition: transform 0.08s, background 0.15s;
+}
+
+.btn-go:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.btn-go:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* ── Show In Progress screen ──────────────────────────────────────── */

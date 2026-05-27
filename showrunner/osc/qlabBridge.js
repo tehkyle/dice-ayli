@@ -356,4 +356,12 @@ function startReceiver(db, io) {
   return server;
 }
 
-module.exports = { sendCastToQLab, sendScenesToQLab, startReceiver, checkQLab, setActiveShow };
+async function sendGo() {
+  await ensureConnected();
+  const ws = workspaceQualifier();
+  const addr = ws ? `/workspace/${ws}/go` : '/go';
+  console.log(`[OSC OUT] ${timestamp()} ${addr}`);
+  oscClient.send(addr);
+}
+
+module.exports = { sendCastToQLab, sendScenesToQLab, startReceiver, checkQLab, setActiveShow, sendGo };
