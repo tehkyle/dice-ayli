@@ -1,4 +1,4 @@
-const REPO = 'tehkyle/dice-ayli';
+const RELEASES_PAGE = 'https://github.com/tehkyle/dice-ayli/releases/latest';
 
 const btnDownload = document.getElementById('btn-download');
 const dlVersion   = document.getElementById('dl-version');
@@ -6,26 +6,19 @@ const dlError     = document.getElementById('dl-error');
 
 async function loadLatestRelease() {
   try {
-    const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
-      headers: { Accept: 'application/vnd.github+json' },
-    });
+    const res = await fetch('/latest.json');
+    if (!res.ok) throw new Error(`${res.status}`);
+    const { version, url } = await res.json();
+    if (!url) throw new Error('no url');
 
-    if (!res.ok) throw new Error(`GitHub API ${res.status}`);
-
-    const release = await res.json();
-    const dmg = release.assets.find(a => a.name.endsWith('.dmg'));
-
-    if (!dmg) throw new Error('No .dmg asset found');
-
-    dlVersion.textContent = release.tag_name;
-    btnDownload.href = dmg.browser_download_url;
+    dlVersion.textContent = version;
+    btnDownload.href = url;
     btnDownload.removeAttribute('aria-disabled');
   } catch (err) {
     console.error('[download]', err.message);
     dlVersion.textContent = '';
     dlError.classList.remove('hidden');
-    // Fall back to the releases page so the user can still download manually
-    btnDownload.href = `https://github.com/${REPO}/releases/latest`;
+    btnDownload.href = RELEASES_PAGE;
     btnDownload.removeAttribute('aria-disabled');
   }
 }
