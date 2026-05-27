@@ -1,33 +1,25 @@
-const { app, BrowserWindow } = require('electron');
-const path  = require('path');
-const http  = require('http');
-const { fork } = require('child_process');
+const { app, BrowserWindow, utilityProcess, dialog, globalShortcut } = require('electron');
+const path = require('path');
+const http = require('http');
 
 const PORT = parseInt(process.env.PORT, 10) || 3000;
 
 let serverProcess;
 let mainWindow;
 
-// Start the Express server as a child process, rooted at the app bundle directory
-// so all relative paths (db/, config.json, .env, sheets-config.json) resolve correctly.
 function startServer() {
   const appRoot = app.getAppPath();
-  serverProcess = fork(path.join(appRoot, 'server.js'), [], {
-    cwd: appRoot,
-    env: { ...process.env, PORT: String(PORT) },
-    silent: false,
+  serverProcess = utilityProcess.fork(path.join(appRoot, 'server.js'), [], {
+    cwd:   appRoot,
+    env:   { ...process.env, PORT: String(PORT) },
+    stdio: 'pipe',
   });
 
-  serverProcess.on('error', (err) => {
-    console.error('[Electron] Server process error:', err.message);
-  });
-
-  serverProcess.on('exit', (code) => {
-    console.log(`[Electron] Server process exited with code ${code}`);
-  });
+  serverProcess.stdout.on('data', d => console.log('[Server]', d.toString().trimEnd()));
+  serverProcess.stderr.on('data', d => console.error('[Server]', d.toString().trimEnd()));
+  serverProcess.on('exit', code => console.log(`[Electron] Server exited with code ${code}`));
 }
 
-// Poll until Express responds, then open the window
 function waitForServer(onReady, attemptsLeft = 40) {
   http.get(`http://localhost:${PORT}`, () => {
     onReady();
@@ -35,7 +27,10 @@ function waitForServer(onReady, attemptsLeft = 40) {
     if (attemptsLeft > 0) {
       setTimeout(() => waitForServer(onReady, attemptsLeft - 1), 250);
     } else {
-      console.error('[Electron] Server did not start in time');
+      dialog.showErrorBox(
+        'Dacha DICE: AYLI — Server failed to start',
+        `The local server did not respond on port ${PORT} after 10 seconds.\n\nRun the app from Terminal for logs:\n  /Applications/Dacha-Dice-AYLI.app/Contents/MacOS/Dacha-Dice-AYLI`
+      );
     }
   });
 }
@@ -58,12 +53,16 @@ function createWindow() {
 app.whenReady().then(() => {
   startServer();
   waitForServer(createWindow);
+
+  globalShortcut.register('CommandOrControl+Alt+I', () => {
+    if (mainWindow) mainWindow.webContents.toggleDevTools();
+  });
 });
 
-app.on('window-all-closed', () => {
-  app.quit();
-});
+app.on('window-all-closed', () => app.quit());
 
 app.on('before-quit', () => {
-  if (serverProcess) serverProcess.kill('SIGTERM');
+  if (serverProcess) serverProcess.kill();
 });
+
+app.on('will-quit', () => globalShortcut.unregisterAll());

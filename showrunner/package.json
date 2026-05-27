@@ -11,9 +11,11 @@
     "release": "bash scripts/release.sh"
   },
   "dependencies": {
+    "@googleapis/drive": "*",
+    "@googleapis/sheets": "*",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "googleapis": "^144.0.0",
+    "google-auth-library": "^9.0.0",
     "lowdb": "^7.0.1",
     "node-osc": "^9.1.0",
     "socket.io": "^4.7.5"
@@ -31,7 +33,7 @@
         {
           "target": "dmg",
           "arch": [
-            "universal"
+            "arm64"
           ]
         }
       ],

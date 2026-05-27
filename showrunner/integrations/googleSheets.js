@@ -1,6 +1,9 @@
 const fs   = require('fs');
 const path = require('path');
 
+const { OAuth2Client }      = require('google-auth-library');
+const { sheets: sheetsV4 } = require('@googleapis/sheets');
+
 const { getTokens, saveTokens, readSheetsConfig } = require('./sheetsConfig');
 
 function loadConfig() {
@@ -15,8 +18,7 @@ function buildAuth() {
   const tokens = getTokens();
   if (!tokens) throw new Error('[Sheets] No OAuth tokens — connect Google account via the config modal');
 
-  const { google } = require('googleapis');
-  const oauth2Client = new google.auth.OAuth2(
+  const oauth2Client = new OAuth2Client(
     process.env.GOOGLE_OAUTH_CLIENT_ID,
     process.env.GOOGLE_OAUTH_CLIENT_SECRET,
     'urn:ietf:wg:oauth:2.0:oob'
@@ -59,9 +61,8 @@ async function appendShowToSheet(show, castAssignments, scenesPlayed) {
     return;
   }
 
-  const { google } = require('googleapis');
   const config = loadConfig();
-  const sheets = google.sheets({ version: 'v4', auth });
+  const sheets = sheetsV4({ version: 'v4', auth });
 
   // Build cast columns in config track order
   const castMap = {};
