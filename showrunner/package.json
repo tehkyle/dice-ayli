@@ -23,7 +23,7 @@
     "@sveltejs/vite-plugin-svelte": "^7.1.2",
     "concurrently": "^9.2.1",
     "electron": "^33.0.0",
-    "electron-builder": "^25.0.0",
+    "electron-builder": "^26.8.1",
     "svelte": "^5.55.9",
     "vite": "^8.0.14"
   },
@@ -42,11 +42,27 @@
         }
       ],
       "category": "public.app-category.productivity",
-      "identity": null,
-      "artifactName": "Dacha-Dice-AYLI-mac.dmg"
+      "identity": null
+    },
+    "dmg": {
+      "artifactName": "Dacha-Dice-AYLI-mac.dmg",
+      "contents": [
+        {
+          "x": 130,
+          "y": 220,
+          "type": "file"
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
     },
     "files": [
       "**/*",
+      "!src/**",
       "!dist/**",
       "!**/*.md",
       "!node_modules/.cache/**",
