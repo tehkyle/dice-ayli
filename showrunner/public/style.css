@@ -1103,3 +1103,192 @@ body.history-page {
 .modal-save-status.error {
   color: var(--danger);
 }
+
+/* ── Show In Progress screen ──────────────────────────────────────── */
+
+.progress-meta {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.progress-perf {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.progress-start {
+  font-size: 0.9rem;
+  color: var(--text-dim);
+}
+
+.progress-qlab-ok {
+  font-size: 0.85rem;
+  color: var(--success);
+}
+
+.progress-qlab-warn {
+  font-size: 0.85rem;
+  color: var(--warn);
+}
+
+.progress-section-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.progress-scene-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.progress-empty {
+  color: var(--text-dim);
+  font-size: 1rem;
+  padding: 24px 0;
+  text-align: center;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.progress-scene-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px 18px;
+  animation: slideIn 0.2s ease-out;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.progress-scene-name {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.progress-scene-time {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.progress-scene-duration {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  min-width: 48px;
+  text-align: right;
+}
+
+.progress-duration-pending {
+  animation: dotPulse 1.4s ease-in-out infinite;
+  letter-spacing: 0.15em;
+}
+
+@keyframes dotPulse {
+  0%, 100% { opacity: 0.2; }
+  50%       { opacity: 1; }
+}
+
+/* ── Show Summary screen ──────────────────────────────────────────── */
+
+.summary-stats {
+  display: flex;
+  gap: 32px;
+  flex-wrap: wrap;
+}
+
+.summary-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.summary-stat-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.summary-stat-value {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.summary-cast-section,
+.summary-scenes-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.summary-section-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.summary-act-row {
+  display: flex;
+  gap: 12px;
+  font-size: 0.9rem;
+  padding: 4px 0;
+  align-items: baseline;
+}
+
+.summary-act-label {
+  width: 60px;
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding-top: 2px;
+}
+
+.summary-act-scenes {
+  color: var(--text);
+  word-break: break-word;
+  flex: 1;
+}
+
+.summary-scene-dur {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  margin-left: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.summary-sheet-link {
+  text-align: center;
+}
+
+.summary-sheet-link a {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px 32px;
+}

@@ -87,6 +87,32 @@
     </div>
   </section>
 
+  <!-- Screen 4: Show In Progress -->
+  <section id="screen-progress" class="screen">
+    <div class="screen-inner">
+      <h2 class="screen-title">Show In Progress</h2>
+      <div id="progress-meta" class="progress-meta"></div>
+      <div class="progress-section-label">Scenes Played</div>
+      <div id="progress-scene-list" class="progress-scene-list">
+        <div class="progress-empty">Waiting for first scene…</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Screen 5: Show Summary -->
+  <section id="screen-summary" class="screen">
+    <div class="screen-inner">
+      <h2 class="screen-title">Show Complete</h2>
+      <div id="summary-stats" class="summary-stats"></div>
+      <div id="summary-cast" class="summary-cast-section"></div>
+      <div id="summary-scenes" class="summary-scenes-section"></div>
+      <div id="summary-sheet-link" class="summary-sheet-link hidden"></div>
+      <div class="screen-actions">
+        <button id="btn-summary-new-show" class="btn btn-primary btn-xl">Start New Show</button>
+      </div>
+    </div>
+  </section>
+
   <!-- Google Sheets Config Modal -->
   <div id="modal-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
     <div class="modal">
@@ -137,6 +163,7 @@
     </div>
   </div>
 
+  <script src="/socket.io/socket.io.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

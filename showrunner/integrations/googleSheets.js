@@ -33,7 +33,7 @@ function buildAuth() {
  * Append one row to the configured Google Sheet for a completed show.
  *
  * Row format:
- *   Date | Perf # | Start | Run Time | <one col per track in config order> | <one col per act: scenes played in order>
+ *   Perf # | Date | Start Time | Run Time | <one col per track in config order> | <one col per act: scenes played in order>
  *
  * Configure spreadsheet and tab via the Google Sheets gear icon in the UI.
  *
@@ -41,7 +41,7 @@ function buildAuth() {
  * @param {Object[]} castAssignments  — [{ character_track, actor_name }]
  * @param {Object[]} scenesPlayed     — [{ scene_name, timestamp }] sorted by time
  */
-async function appendShowToSheet(show, castAssignments, scenesPlayed) {
+async function appendShowToSheet(show, performanceNumber, castAssignments, scenesPlayed) {
   let auth;
   try {
     auth = buildAuth();
@@ -79,25 +79,45 @@ async function appendShowToSheet(show, castAssignments, scenesPlayed) {
   });
 
   const startTime = show.locked_at
-    ? new Date(show.locked_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+    ? new Date(show.locked_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
     : '';
 
   let runTime = '';
   if (show.locked_at && show.ended_at) {
-    const totalMins = Math.round((new Date(show.ended_at) - new Date(show.locked_at)) / 60000);
-    const h = Math.floor(totalMins / 60);
-    const m = totalMins % 60;
-    runTime = `${h}:${String(m).padStart(2, '0')}`;
+    const totalSec = Math.round((new Date(show.ended_at) - new Date(show.locked_at)) / 1000);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    runTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   }
 
   const row = [
+    performanceNumber,
     show.show_date,
-    show.performance_number,
     startTime,
     runTime,
     ...castColumns,
     ...actSceneColumns,
   ];
+
+  // Auto-write header row if A1 is empty
+  const headerCheck = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `${sheetTabName}!A1`,
+  });
+  const hasHeader = !!(headerCheck.data.values && headerCheck.data.values[0] && headerCheck.data.values[0][0]);
+  if (!hasHeader) {
+    const trackHeaders = (config.characterTracks || []).map(t => t.label);
+    const actHeaders   = (config.acts || []).map(a => a.label);
+    const headerRow = ['Perf #', 'Date', 'Start Time', 'Run Time', ...trackHeaders, ...actHeaders];
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range:            `${sheetTabName}!A1`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody:      { values: [headerRow] },
+    });
+    console.log(`[Sheets] ${timestamp()} Header row written to "${sheetTabName}"`);
+  }
 
   console.log(`[Sheets] ${timestamp()} Appending row for show ${show.id} to "${sheetTabName}": ${row.join(' | ')}`);
 

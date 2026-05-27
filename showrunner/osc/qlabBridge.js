@@ -298,7 +298,7 @@ function startReceiver(db, io) {
       return;
     }
 
-    if (address === '/show/scene_picked') {
+    if (address === '/show/scene_started') {
       const sceneName = args[0];
       if (!sceneName) return;
       try {
@@ -314,7 +314,7 @@ function startReceiver(db, io) {
       } catch (err) {
         console.error(`[OSC ERR] ${timestamp()} scene_log insert failed: ${err.message}`);
       }
-      if (io) io.emit('scene_played', { scene: sceneName, time: timestamp() });
+      if (io) io.emit('scene_started', { scene: sceneName, time: timestamp() });
       return;
     }
 
@@ -332,11 +332,14 @@ function startReceiver(db, io) {
         if (!show) return;
         show.ended_at = new Date().toISOString();
         db.write();
+        const performanceNumber = [...db.data.shows]
+          .sort((a, b) => a.id - b.id)
+          .findIndex(s => s.id === showId) + 1;
         const castAssignments = db.data.cast_assignments.filter(a => a.show_id === showId);
         const scenesPlayed = db.data.scene_log
           .filter(e => e.show_id === showId)
           .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-        appendShowToSheet(show, castAssignments, scenesPlayed).catch(err => {
+        appendShowToSheet(show, performanceNumber, castAssignments, scenesPlayed).catch(err => {
           console.error(`[Sheets ERR] ${timestamp()} ${err.message}`);
         });
       } catch (err) {

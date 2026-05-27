@@ -5,13 +5,18 @@ let characterTracks = []; // [{ id, label, subtitle }]
 let acts = [];            // [{ id, label, scenes: [] }]
 const actOrderedState = {}; // actId → boolean: is act in fixed-order mode?
 const actOrderedLists = {}; // actId → string[]: ordered scene IDs for rigged acts
+let scenesPlayed = [];    // [{ scene, time, duration }] — live-filled during show
+let lockTime = null;      // Date — set when cast is locked
+let socket = null;        // socket.io connection
 
 // --- DOM refs ---
 const screens = {
-  welcome: document.getElementById('screen-welcome'),
-  scenes:  document.getElementById('screen-scenes'),
-  cast:    document.getElementById('screen-cast'),
-  confirm: document.getElementById('screen-confirm'),
+  welcome:  document.getElementById('screen-welcome'),
+  scenes:   document.getElementById('screen-scenes'),
+  cast:     document.getElementById('screen-cast'),
+  confirm:  document.getElementById('screen-confirm'),
+  progress: document.getElementById('screen-progress'),
+  summary:  document.getElementById('screen-summary'),
 };
 
 const todayDateEl     = document.getElementById('today-date');
@@ -34,6 +39,15 @@ const castSummaryEl   = document.getElementById('cast-summary');
 const lockStatusEl    = document.getElementById('lock-status');
 const btnLock         = document.getElementById('btn-lock');
 const btnNewShow      = document.getElementById('btn-new-show');
+
+// Progress / Summary refs
+const progressMetaEl    = document.getElementById('progress-meta');
+const progressSceneList = document.getElementById('progress-scene-list');
+const summaryStatsEl    = document.getElementById('summary-stats');
+const summaryCastEl     = document.getElementById('summary-cast');
+const summaryScenesEl   = document.getElementById('summary-scenes');
+const summarySheetLink  = document.getElementById('summary-sheet-link');
+const btnSummaryNewShow = document.getElementById('btn-summary-new-show');
 
 // Modal refs
 const modalOverlay    = document.getElementById('modal-overlay');
@@ -647,18 +661,11 @@ btnLock.addEventListener('click', async () => {
     });
     const data = await res.json();
 
-    btnLock.classList.add('hidden');
-    btnBackConfirm.classList.add('hidden');
-    btnNewShow.classList.remove('hidden');
-    lockStatusEl.classList.remove('hidden', 'success', 'warn');
-
-    if (data.qlabNotified) {
-      lockStatusEl.classList.add('success');
-      lockStatusEl.textContent = '✓ CAST LOCKED — QLab notified';
-    } else {
-      lockStatusEl.classList.add('warn');
-      lockStatusEl.textContent = '✓ Cast saved — QLab notification failed';
-    }
+    lockTime = new Date();
+    scenesPlayed = [];
+    buildProgressScreen(data);
+    showScreen('progress');
+    ensureSocket();
   } catch {
     lockStatusEl.classList.remove('hidden', 'success');
     lockStatusEl.classList.add('warn');
@@ -673,6 +680,150 @@ btnNewShow.addEventListener('click', async () => {
   await initWelcomeScreen();
   showScreen('welcome');
   btnBegin.disabled = false;
+});
+
+// --- Screen 4: Show In Progress ---
+
+function formatDuration(ms) {
+  if (ms == null || ms < 0) return '—';
+  const totalSec = Math.round(ms / 1000);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return m > 0 ? `${m}m ${s}s` : `${s}s`;
+}
+
+function formatDurationReport(ms) {
+  if (ms == null || ms < 0) return '—';
+  const totalSec = Math.round(ms / 1000);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function updateSceneDuration(idx, ms) {
+  const el = document.getElementById(`scene-dur-${idx}`);
+  if (!el) return;
+  el.classList.remove('progress-duration-pending');
+  el.textContent = formatDuration(ms);
+}
+
+function ensureSocket() {
+  if (socket) return;
+  socket = io();
+  socket.on('scene_started', ({ scene, time }) => {
+    if (scenesPlayed.length > 0) {
+      const prev = scenesPlayed[scenesPlayed.length - 1];
+      prev.duration = new Date(time) - new Date(prev.time);
+      updateSceneDuration(scenesPlayed.length - 1, prev.duration);
+    }
+    scenesPlayed.push({ scene, time, duration: null });
+    appendSceneToProgress(scene, time);
+  });
+  socket.on('show_ended', ({ time }) => {
+    if (scenesPlayed.length > 0) {
+      const last = scenesPlayed[scenesPlayed.length - 1];
+      last.duration = new Date(time) - new Date(last.time);
+      updateSceneDuration(scenesPlayed.length - 1, last.duration);
+    }
+    buildSummaryScreen(time);
+    showScreen('summary');
+  });
+}
+
+function buildProgressScreen(lockData) {
+  const startTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  const qlabLine = lockData.qlabNotified
+    ? '<span class="progress-qlab-ok">✓ QLab notified</span>'
+    : '<span class="progress-qlab-warn">QLab notification failed</span>';
+  progressMetaEl.innerHTML = `
+    <span class="progress-perf">${perfNumberEl.textContent}</span>
+    <span class="progress-start">Started ${startTime}</span>
+    ${qlabLine}
+  `;
+  progressSceneList.innerHTML = '<div class="progress-empty">Waiting for first scene…</div>';
+}
+
+function appendSceneToProgress(scene, time) {
+  const empty = progressSceneList.querySelector('.progress-empty');
+  if (empty) empty.remove();
+
+  const idx = scenesPlayed.length - 1;
+  const item = document.createElement('div');
+  item.className = 'progress-scene-item';
+  const t = new Date(time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  item.innerHTML = `
+    <span class="progress-scene-name">${scene}</span>
+    <span class="progress-scene-time">${t}</span>
+    <span class="progress-scene-duration progress-duration-pending" id="scene-dur-${idx}">•••</span>
+  `;
+  progressSceneList.appendChild(item);
+  progressSceneList.scrollTop = progressSceneList.scrollHeight;
+}
+
+// --- Screen 5: Show Summary ---
+
+async function buildSummaryScreen(endTime) {
+  const showLength = lockTime && endTime ? formatDuration(new Date(endTime) - lockTime) : '—';
+  summaryStatsEl.innerHTML = `
+    <div class="summary-stat">
+      <span class="summary-stat-label">Performance</span>
+      <span class="summary-stat-value">${perfNumberEl.textContent}</span>
+    </div>
+    <div class="summary-stat">
+      <span class="summary-stat-label">Date</span>
+      <span class="summary-stat-value">${todayDateEl.textContent}</span>
+    </div>
+    <div class="summary-stat">
+      <span class="summary-stat-label">Show Length</span>
+      <span class="summary-stat-value">${showLength}</span>
+    </div>
+  `;
+
+  summaryCastEl.innerHTML = '<div class="summary-section-label">Cast</div>';
+  const castMap = getCastSelections();
+  characterTracks.forEach(track => {
+    const actorName = castMap[track.id] || '—';
+    const row = document.createElement('div');
+    row.className = 'summary-row';
+    row.innerHTML = `<div class="summary-track">${track.label}</div><div class="summary-actor"><span>${actorName}</span></div>`;
+    summaryCastEl.appendChild(row);
+  });
+
+  summaryScenesEl.innerHTML = '<div class="summary-section-label">Scenes Played</div>';
+  acts.forEach(act => {
+    const actScenes = scenesPlayed.filter(e => act.scenes.includes(e.scene));
+    const row = document.createElement('div');
+    row.className = 'summary-act-row';
+    const scenesHtml = actScenes.length
+      ? actScenes.map(e => `${e.scene}<span class="summary-scene-dur">${formatDurationReport(e.duration)}</span>`).join(' → ')
+      : '—';
+    row.innerHTML = `
+      <span class="summary-act-label">${act.label}</span>
+      <span class="summary-act-scenes">${scenesHtml}</span>
+    `;
+    summaryScenesEl.appendChild(row);
+  });
+
+  try {
+    const res = await fetch('/api/config/sheets');
+    const cfg = await res.json();
+    if (cfg.spreadsheetId) {
+      summarySheetLink.classList.remove('hidden');
+      summarySheetLink.innerHTML = `<a href="https://docs.google.com/spreadsheets/d/${cfg.spreadsheetId}" target="_blank" class="btn btn-secondary">View in Google Sheets →</a>`;
+    } else {
+      summarySheetLink.classList.add('hidden');
+    }
+  } catch {
+    summarySheetLink.classList.add('hidden');
+  }
+}
+
+btnSummaryNewShow.addEventListener('click', async () => {
+  currentShowId = null;
+  scenesPlayed = [];
+  castRowsEl.innerHTML = '';
+  await initWelcomeScreen();
+  showScreen('welcome');
 });
 
 // --- Google Sheets config modal ---
