@@ -42,10 +42,10 @@ jobs:
           GOOGLE_OAUTH_CLIENT_SECRET=${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
           EOF
 
-      # CSC_IDENTITY_AUTO_DISCOVERY=false skips code signing.
-      # Without a Developer ID certificate the app is unsigned — users will need
-      # to right-click → Open on first launch to bypass Gatekeeper.
-      # See GOOGLE_SETUP.md for first-launch instructions to pass on to stage managers.
+      # Ad-hoc signed (identity: "-") — no Developer ID certificate needed.
+      # macOS will show "unidentified developer" on first launch; users right-click → Open.
+      # CSC_IDENTITY_AUTO_DISCOVERY=false prevents electron-builder from scanning the
+      # runner's keychain for a real certificate (there isn't one).
       - name: Build Electron app (.dmg)
         working-directory: showrunner
         env:
