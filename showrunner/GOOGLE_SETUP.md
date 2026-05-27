@@ -19,7 +19,7 @@ This is a one-time setup per deployment. Once done, stage managers use the gear 
 1. Go to [console.cloud.google.com](https://console.cloud.google.com)
 2. Click the project selector at the top of the page (it may say "Select a project" or show an existing project name)
 3. Click **New Project**
-4. Give it a name — something like `Dacha-Dice-AYLI` or `AYLI`
+4. Give it a name — something like `Showrunner` or `AYLI`
 5. Click **Create**
 6. Wait a moment, then make sure your new project is selected in the top dropdown
 
@@ -44,7 +44,7 @@ Before creating credentials, Google needs to know what this app is and who can u
    - If users have regular Gmail accounts (not Workspace), choose **External** instead.
 3. Click **Create**
 4. Fill in the required fields:
-   - **App name**: `Dacha DICE: AYLI` (or whatever you like — this is shown on the Google login screen)
+   - **App name**: `Showrunner` (or whatever you like — this is shown on the Google login screen)
    - **User support email**: your email
    - **Developer contact information**: your email
 5. Click **Save and Continue**
@@ -59,7 +59,7 @@ Before creating credentials, Google needs to know what this app is and who can u
 1. In the left sidebar, go to **APIs & Services → Credentials**
 2. Click **+ Create Credentials → OAuth client ID**
 3. For **Application type**, choose **Web application**
-4. Give it a name, e.g. `Dacha-Dice-AYLI Web`
+4. Give it a name, e.g. `Showrunner Web`
 5. Under **Authorized redirect URIs**, click **+ Add URI** and add:
    ```
    http://localhost:3000/api/auth/google/callback

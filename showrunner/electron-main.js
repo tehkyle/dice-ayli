@@ -6,31 +6,58 @@ const PORT = parseInt(process.env.PORT, 10) || 3000;
 
 let serverProcess;
 let mainWindow;
+const serverLogs = [];
+let pollTimer;
+
+function log(line) {
+  console.log(line);
+  serverLogs.push(line);
+}
+
+function showFatalError(title) {
+  const recentLogs = serverLogs.slice(-30).join('\n') || '(no output captured)';
+  dialog.showErrorBox(
+    `Dacha DICE: AYLI — ${title}`,
+    `Server logs:\n\n${recentLogs}`
+  );
+}
 
 function startServer() {
   const appRoot = app.getAppPath();
+  log(`[Electron] appRoot: ${appRoot}`);
+
   serverProcess = utilityProcess.fork(path.join(appRoot, 'server.js'), [], {
     cwd:   appRoot,
     env:   { ...process.env, PORT: String(PORT) },
     stdio: 'pipe',
   });
 
-  serverProcess.stdout.on('data', d => console.log('[Server]', d.toString().trimEnd()));
-  serverProcess.stderr.on('data', d => console.error('[Server]', d.toString().trimEnd()));
-  serverProcess.on('exit', code => console.log(`[Electron] Server exited with code ${code}`));
+  serverProcess.on('spawn', () => log('[Electron] Server process spawned'));
+
+  serverProcess.stdout.on('data', d => d.toString().split('\n').filter(Boolean).forEach(log));
+  serverProcess.stderr.on('data', d => d.toString().split('\n').filter(Boolean).forEach(l => log('[ERR] ' + l)));
+
+  serverProcess.on('exit', (code) => {
+    log(`[Electron] Server exited with code ${code}`);
+    if (pollTimer) {
+      clearTimeout(pollTimer);
+      pollTimer = null;
+      showFatalError(`Server crashed (exit code ${code})`);
+    }
+  });
 }
 
 function waitForServer(onReady, attemptsLeft = 40) {
-  http.get(`http://localhost:${PORT}`, () => {
+  const req = http.get(`http://localhost:${PORT}`, () => {
+    pollTimer = null;
     onReady();
-  }).on('error', () => {
+  });
+  req.on('error', () => {
     if (attemptsLeft > 0) {
-      setTimeout(() => waitForServer(onReady, attemptsLeft - 1), 250);
+      pollTimer = setTimeout(() => waitForServer(onReady, attemptsLeft - 1), 250);
     } else {
-      dialog.showErrorBox(
-        'Dacha DICE: AYLI — Server failed to start',
-        `The local server did not respond on port ${PORT} after 10 seconds.\n\nRun the app from Terminal for logs:\n  /Applications/Dacha-Dice-AYLI.app/Contents/MacOS/Dacha-Dice-AYLI`
-      );
+      pollTimer = null;
+      showFatalError(`Server did not respond on port ${PORT} after 10 seconds`);
     }
   });
 }

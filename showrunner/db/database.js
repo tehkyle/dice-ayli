@@ -1,10 +1,23 @@
-const { LowSync } = require('lowdb');
-const { JSONFileSync } = require('lowdb/node');
+const fs   = require('fs');
 const path = require('path');
 
-const adapter = new JSONFileSync(path.join(__dirname, 'showrunner.json'));
-const db = new LowSync(adapter, { shows: [], cast_assignments: [], scene_log: [] });
-db.read();
+const DB_PATH = path.join(__dirname, 'showrunner.json');
+const DEFAULT = { shows: [], cast_assignments: [], scene_log: [] };
+
+function readData() {
+  try {
+    return JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
+  } catch {
+    return { ...DEFAULT, shows: [], cast_assignments: [], scene_log: [] };
+  }
+}
+
+// Drop-in replacement for lowdb's LowSync: same .data / .read() / .write() API.
+const db = {
+  data: readData(),
+  read()  { this.data = readData(); },
+  write() { fs.writeFileSync(DB_PATH, JSON.stringify(this.data, null, 2)); },
+};
 
 function getDb() {
   return db;

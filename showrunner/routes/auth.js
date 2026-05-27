@@ -1,6 +1,6 @@
 const express = require('express');
 const router  = express.Router();
-const { OAuth2Client } = require('google-auth-library');
+const { google } = require('googleapis');
 
 const {
   readSheetsConfig,
@@ -19,7 +19,7 @@ function buildOAuthClient(req) {
   const proto       = req.headers['x-forwarded-proto'] || req.protocol;
   const host        = req.headers['x-forwarded-host']  || req.headers.host;
   const redirectUri = `${proto}://${host}/api/auth/google/callback`;
-  return new OAuth2Client(
+  return new google.auth.OAuth2(
     process.env.GOOGLE_OAUTH_CLIENT_ID,
     process.env.GOOGLE_OAUTH_CLIENT_SECRET,
     redirectUri
@@ -52,9 +52,8 @@ router.get('/google/callback', async (req, res) => {
     const { tokens }   = await oauth2Client.getToken(req.query.code);
     oauth2Client.setCredentials(tokens);
 
-    const { data } = await oauth2Client.request({
-      url: 'https://www.googleapis.com/oauth2/v2/userinfo',
-    });
+    const oauth2Info = google.oauth2({ version: 'v2', auth: oauth2Client });
+    const { data }   = await oauth2Info.userinfo.get();
 
     saveTokens(tokens);
     writeSheetsConfig({ userEmail: data.email || null });

@@ -1,8 +1,6 @@
 const express    = require('express');
 const router     = express.Router();
-const { OAuth2Client }    = require('google-auth-library');
-const { drive: driveV3 } = require('@googleapis/drive');
-const { sheets: sheetsV4 } = require('@googleapis/sheets');
+const { google } = require('googleapis');
 
 const { getTokens, saveTokens } = require('../integrations/sheetsConfig');
 
@@ -17,7 +15,7 @@ function buildAuthenticatedClient(req) {
   const host        = req.headers['x-forwarded-host']  || req.headers.host;
   const redirectUri = `${proto}://${host}/api/auth/google/callback`;
 
-  const oauth2Client = new OAuth2Client(
+  const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_OAUTH_CLIENT_ID,
     process.env.GOOGLE_OAUTH_CLIENT_SECRET,
     redirectUri
@@ -36,7 +34,7 @@ router.get('/list', async (req, res) => {
     return res.status(err.status || 500).json({ error: err.message });
   }
   try {
-    const drive = driveV3({ version: 'v3', auth: oauth2Client });
+    const drive = google.drive({ version: 'v3', auth: oauth2Client });
     const { data } = await drive.files.list({
       q:       "mimeType='application/vnd.google-apps.spreadsheet' and trashed=false",
       fields:  'files(id,name)',
@@ -59,7 +57,7 @@ router.get('/:id/tabs', async (req, res) => {
     return res.status(err.status || 500).json({ error: err.message });
   }
   try {
-    const sheets = sheetsV4({ version: 'v4', auth: oauth2Client });
+    const sheets = google.sheets({ version: 'v4', auth: oauth2Client });
     const { data } = await sheets.spreadsheets.get({
       spreadsheetId: req.params.id,
       fields: 'sheets.properties.title',
