@@ -118,6 +118,33 @@ code {
   letter-spacing: 0.04em;
 }
 
+.btn-qlab {
+  display:         inline-flex;
+  align-items:     center;
+  gap:             12px;
+  background:      transparent;
+  color:           var(--text-dim);
+  font-weight:     600;
+  font-size:       0.9rem;
+  padding:         10px 24px;
+  border-radius:   10px;
+  border:          1px solid var(--border);
+  text-decoration: none;
+  transition:      border-color 0.15s, color 0.15s;
+  letter-spacing:  0.01em;
+  margin-top:      4px;
+}
+.btn-qlab:hover {
+  border-color: var(--text-dim);
+  color:        var(--text);
+  text-decoration: none;
+}
+.btn-qlab[aria-disabled="true"] {
+  opacity: 0.4;
+  cursor: default;
+  pointer-events: none;
+}
+
 .dl-note {
   font-size: 0.82rem;
   color:     var(--text-dim);
