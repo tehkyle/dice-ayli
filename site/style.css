@@ -109,14 +109,6 @@ code {
 
 .dl-icon   { font-size: 1.15rem; }
 .dl-label  { font-size: 1rem; }
-.dl-version {
-  font-size:   0.8rem;
-  font-weight: 500;
-  background:  rgba(0,0,0,0.18);
-  padding:     2px 8px;
-  border-radius: 20px;
-  letter-spacing: 0.04em;
-}
 
 .btn-qlab {
   display:         inline-flex;
@@ -150,11 +142,6 @@ code {
   color:     var(--text-dim);
 }
 
-.dl-error {
-  font-size: 0.82rem;
-  color:     var(--danger);
-}
-.dl-error a { color: var(--danger); text-decoration: underline; }
 
 /* ── Main content ────────────────────────────────────────────────── */
 main {

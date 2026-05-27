@@ -1,4 +1,4 @@
-# Showrunner
+# Dacha DICE: AYLI
 
 Cast management and QLab OSC bridge for interactive theatre.
 
@@ -33,7 +33,7 @@ cp .env.example .env
 | `PORT` | HTTP port for the operator UI (default `3000`) |
 | `QLAB_HOST` | IP address of the QLab machine (default `127.0.0.1`) |
 | `QLAB_SEND_PORT` | UDP port QLab listens on for OSC (default `53000`) |
-| `QLAB_RECEIVE_PORT` | UDP port Showrunner listens on for QLab events (default `53001`) |
+| `QLAB_RECEIVE_PORT` | UDP port Dacha DICE: AYLI listens on for QLab events (default `53001`) |
 | `ACTORS` | Pipe-delimited list of actor names |
 | `CHARACTER_TRACKS` | Pipe-delimited list of character track names — **must match QLab variable names exactly** |
 
@@ -56,11 +56,11 @@ Declare these variables in the QLab workspace (Workspace Settings → Variables)
 
 ### CAST_CONFIRMED cue
 
-Create a cue (or cue list) with the name/number `CAST_CONFIRMED`. Showrunner fires `/cue/CAST_CONFIRMED/start` after all variables are set. Wire this cue to whatever confirmation logic the show needs.
+Create a cue (or cue list) with the name/number `CAST_CONFIRMED`. Dacha DICE: AYLI fires `/cue/CAST_CONFIRMED/start` after all variables are set. Wire this cue to whatever confirmation logic the show needs.
 
 ### Scene pick events (future)
 
-If QLab needs to report scene picks back to Showrunner, create a Network Cue pointing to `127.0.0.1:53001` sending:
+If QLab needs to report scene picks back to Dacha DICE: AYLI, create a Network Cue pointing to `127.0.0.1:53001` sending:
 
 ```
 /show/scene_picked   "SceneName"

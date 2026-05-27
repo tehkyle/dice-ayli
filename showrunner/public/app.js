@@ -172,7 +172,7 @@ async function checkQlabStatus() {
     setQlabStatus('ok', 'QLab connected — all cues ready');
     btnBegin.disabled = false;
   } catch {
-    setQlabStatus('offline', 'Could not reach Showrunner server');
+    setQlabStatus('offline', 'Could not reach Dacha DICE: AYLI server');
     btnBegin.disabled = false;
     btnRetryQlab.classList.remove('hidden');
   }

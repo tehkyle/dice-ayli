@@ -24,7 +24,7 @@
   },
   "build": {
     "appId": "com.ayli.showrunner",
-    "productName": "Showrunner",
+    "productName": "Dacha-Dice-AYLI",
     "asar": false,
     "mac": {
       "target": [
@@ -36,7 +36,8 @@
         }
       ],
       "category": "public.app-category.productivity",
-      "identity": null
+      "identity": null,
+      "artifactName": "Dacha-Dice-AYLI-mac.dmg"
     },
     "files": [
       "**/*",

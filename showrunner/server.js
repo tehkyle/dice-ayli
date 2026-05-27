@@ -44,5 +44,5 @@ io.on('connection', (socket) => {
 });
 
 httpServer.listen(PORT, () => {
-  console.log(`[SERVER] Showrunner running at http://localhost:${PORT}`);
+  console.log(`[SERVER] Dacha DICE: AYLI running at http://localhost:${PORT}`);
 });

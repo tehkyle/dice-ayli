@@ -10,7 +10,7 @@
  *   passcode  = (none)
  *
  * Before running:
- *   1. Stop the main Showrunner server (port 53001 must be free).
+ *   1. Stop the main Dacha DICE: AYLI server (port 53001 must be free).
  *   2. Ensure a Memo cue exists in QLab with cue NUMBER set to [cueNumber].
  */
 

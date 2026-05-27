@@ -44,7 +44,7 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width:  1024,
     height: 768,
-    title:  'Showrunner',
+    title:  'Dacha DICE: AYLI',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,

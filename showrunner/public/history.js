@@ -12,7 +12,7 @@ async function load() {
       fetch('/api/config').then(r => r.json()),
     ]);
   } catch {
-    root.innerHTML = '<div class="history-error">Could not reach Showrunner server.</div>';
+    root.innerHTML = '<div class="history-error">Could not reach Dacha DICE: AYLI server.</div>';
     return;
   }
 

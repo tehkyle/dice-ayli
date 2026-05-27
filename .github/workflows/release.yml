@@ -61,33 +61,11 @@ jobs:
             -x "*/Icon"
 
       - name: Create GitHub Release
-        id: release
         uses: softprops/action-gh-release@v2
         with:
-          name: "Showrunner ${{ github.ref_name }}"
+          name: "Dacha DICE: AYLI ${{ github.ref_name }}"
           generate_release_notes: true
           files: |
             showrunner/dist/*.dmg
             qlab-show-files.zip
 
-      # Write version + download URLs into the static site so buttons work
-      # without needing an authenticated GitHub API call.
-      - name: Update site/latest.json
-        run: |
-          echo '${{ steps.release.outputs.assets }}' > /tmp/assets.json
-          DMG_URL=$(jq -r '[.[] | select(.name | endswith(".dmg"))][0].browser_download_url // ""' /tmp/assets.json)
-          QLAB_URL=$(jq -r '[.[] | select(.name == "qlab-show-files.zip")][0].browser_download_url // ""' /tmp/assets.json)
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git fetch origin main
-          git checkout main
-          git pull --rebase origin main
-          jq -n \
-            --arg version "${{ github.ref_name }}" \
-            --arg url "$DMG_URL" \
-            --arg qlabUrl "$QLAB_URL" \
-            '{version: $version, url: (if $url == "" then null else $url end), qlabUrl: (if $qlabUrl == "" then null else $qlabUrl end)}' \
-            > site/latest.json
-          git add site/latest.json
-          git commit -m "release: update download links to ${{ github.ref_name }}"
-          git push origin main
