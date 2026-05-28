@@ -32,14 +32,9 @@ function buildAuth() {
 /**
  * Append one row to the configured Google Sheet for a completed show.
  *
- * Row format:
- *   Perf # | Date | Start Time | Run Time | <one col per track in config order> | <one col per act: scenes played in order>
- *
- * Configure spreadsheet and tab via the Google Sheets gear icon in the UI.
- *
- * @param {Object}   show             — show record from DB
- * @param {Object[]} castAssignments  — [{ character_track, actor_name }]
- * @param {Object[]} scenesPlayed     — [{ scene_name, timestamp }] sorted by time
+ * Returns { success: boolean, tsvRow: string } if sheets is configured,
+ * or null if sheets is not configured (no tokens / no spreadsheet).
+ * tsvRow is a human-readable tab-separated fallback for manual pasting.
  */
 async function appendShowToSheet(show, performanceNumber, castAssignments, scenesPlayed) {
   let auth;
@@ -47,7 +42,7 @@ async function appendShowToSheet(show, performanceNumber, castAssignments, scene
     auth = buildAuth();
   } catch (err) {
     console.warn(err.message);
-    return;
+    return null; // not configured — no error to surface
   }
 
   const sheetsConfig  = readSheetsConfig();
@@ -56,7 +51,7 @@ async function appendShowToSheet(show, performanceNumber, castAssignments, scene
 
   if (!spreadsheetId) {
     console.warn('[Sheets] No spreadsheetId configured — skipping export. Select a spreadsheet in the config modal.');
-    return;
+    return null; // not configured
   }
 
   const { google } = require('googleapis');
@@ -68,15 +63,39 @@ async function appendShowToSheet(show, performanceNumber, castAssignments, scene
   castAssignments.forEach(a => { castMap[a.character_track] = a.actor_name; });
   const castColumns = (config.characterTracks || []).map(t => castMap[t.id] || '');
 
-  // Build scene columns — one per act, scenes joined by " → "
-  const actIds = (config.acts || []).map(a => a.id);
-  const actSceneColumns = actIds.map(actId => {
-    const actScenes = scenesPlayed.filter(e => {
-      const act = (config.acts || []).find(a => a.id === actId);
-      return act && act.scenes.includes(e.scene_name);
-    });
-    return actScenes.map(e => e.scene_name).join(' → ');
-  });
+  // Two flavours of duration cell:
+  //   durationCell     → Sheets time serial for correct column formatting + AVERAGE
+  //   durationCellTsv  → human-readable m:ss string for clipboard fallback
+  function durationCell(entry) {
+    if (!entry || entry.duration_ms == null) return '';
+    return entry.duration_ms / 86400000;
+  }
+  function durationCellTsv(entry) {
+    if (!entry || entry.duration_ms == null) return '';
+    const totalSec = Math.round(entry.duration_ms / 1000);
+    const m = Math.floor(totalSec / 60);
+    const s = totalSec % 60;
+    return `${m}:${String(s).padStart(2, '0')}`;
+  }
+
+  // Per act: one order column + one duration column per possible scene
+  const actSceneColumns    = [];
+  const actSceneColumnsTsv = [];
+  for (const act of (config.acts || [])) {
+    const actScenes = scenesPlayed.filter(e => act.scenes.includes(e.scene_name));
+    const orderStr  = actScenes.map(e => e.scene_name).join(' → ');
+    actSceneColumns.push(orderStr);
+    actSceneColumnsTsv.push(orderStr);
+    for (const sceneName of act.scenes) {
+      const entry = actScenes.find(e => e.scene_name === sceneName);
+      actSceneColumns.push(durationCell(entry));
+      actSceneColumnsTsv.push(durationCellTsv(entry));
+    }
+  }
+
+  // Static scenes (Entr'acte, Finale, etc.) — one duration column each
+  const staticSceneColumns    = (config.staticScenes || []).map(n => durationCell(scenesPlayed.find(e => e.scene_name === n)));
+  const staticSceneColumnsTsv = (config.staticScenes || []).map(n => durationCellTsv(scenesPlayed.find(e => e.scene_name === n)));
 
   const startTime = show.locked_at
     ? new Date(show.locked_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
@@ -101,38 +120,105 @@ async function appendShowToSheet(show, performanceNumber, castAssignments, scene
     runTime,
     ...castColumns,
     ...actSceneColumns,
+    ...staticSceneColumns,
   ];
 
-  // Auto-write header row if A1 is empty
-  const headerCheck = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: `${sheetTabName}!A1`,
-  });
-  const hasHeader = !!(headerCheck.data.values && headerCheck.data.values[0] && headerCheck.data.values[0][0]);
-  if (!hasHeader) {
-    const trackHeaders = (config.characterTracks || []).map(t => t.label);
-    const actHeaders   = (config.acts || []).map(a => a.label);
-    const headerRow = ['Date', 'Start Time', 'Run Time', ...trackHeaders, ...actHeaders];
-    await sheets.spreadsheets.values.update({
+  // Human-readable TSV for clipboard fallback — no Sheets tricks, durations as m:ss
+  const tsvRow = [showDate, startTime, runTime, ...castColumns, ...actSceneColumnsTsv, ...staticSceneColumnsTsv].join('\t');
+
+  try {
+    // Auto-write header row + set column formats if A1 is empty
+    const headerCheck = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `${sheetTabName}!A1`,
+    });
+    const hasHeader = !!(headerCheck.data.values?.[0]?.[0]);
+    if (!hasHeader) {
+      const trackHeaders  = (config.characterTracks || []).map(t => t.label);
+      const sceneHeaders  = [];
+      for (const act of (config.acts || [])) {
+        sceneHeaders.push(`${act.label} Order`);
+        for (const sceneName of act.scenes) sceneHeaders.push(sceneName);
+      }
+      const staticHeaders = config.staticScenes || [];
+      const headerRow = ['Date', 'Start Time', 'Run Time', ...trackHeaders, ...sceneHeaders, ...staticHeaders];
+
+      await sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range:            `${sheetTabName}!A1`,
+        valueInputOption: 'RAW',
+        requestBody:      { values: [headerRow] },
+      });
+      console.log(`[Sheets] ${timestamp()} Header row written to "${sheetTabName}"`);
+
+      await applyColumnFormats(sheets, spreadsheetId, sheetTabName, config);
+    }
+
+    console.log(`[Sheets] ${timestamp()} Appending row for show ${show.id} to "${sheetTabName}": ${row.join(' | ')}`);
+
+    await sheets.spreadsheets.values.append({
       spreadsheetId,
       range:            `${sheetTabName}!A1`,
       valueInputOption: 'USER_ENTERED',
-      requestBody:      { values: [headerRow] },
+      insertDataOption: 'INSERT_ROWS',
+      requestBody:      { values: [row] },
     });
-    console.log(`[Sheets] ${timestamp()} Header row written to "${sheetTabName}"`);
+
+    console.log(`[Sheets] ${timestamp()} Row appended successfully`);
+    return { success: true, tsvRow };
+
+  } catch (err) {
+    console.error(`[Sheets ERR] ${timestamp()} Failed to write to sheet: ${err.message}`);
+    return { success: false, tsvRow };
   }
+}
 
-  console.log(`[Sheets] ${timestamp()} Appending row for show ${show.id} to "${sheetTabName}": ${row.join(' | ')}`);
+/**
+ * Set number formats on time/duration columns so values display correctly
+ * without the user needing to manually format them.
+ */
+async function applyColumnFormats(sheets, spreadsheetId, sheetTabName, config) {
+  try {
+    const meta = await sheets.spreadsheets.get({
+      spreadsheetId,
+      fields: 'sheets.properties',
+    });
+    const sheetId = meta.data.sheets.find(s => s.properties.title === sheetTabName)?.properties.sheetId;
+    if (sheetId == null) return;
 
-  await sheets.spreadsheets.values.append({
-    spreadsheetId,
-    range:            `${sheetTabName}!A1`,
-    valueInputOption: 'USER_ENTERED',
-    insertDataOption: 'INSERT_ROWS',
-    requestBody:      { values: [row] },
-  });
+    let col = 0;
+    col++;                                             // Date
+    const startTimeCol = col++;                        // Start Time
+    const runTimeCol   = col++;                        // Run Time
+    col += (config.characterTracks || []).length;      // Cast columns
 
-  console.log(`[Sheets] ${timestamp()} Row appended successfully`);
+    const durationCols = [];
+    for (const act of (config.acts || [])) {
+      col++;                                           // Order column (text)
+      for (const _ of act.scenes) durationCols.push(col++);
+    }
+    for (const _ of (config.staticScenes || [])) durationCols.push(col++);
+
+    function colRange(colIdx) {
+      return { sheetId, startColumnIndex: colIdx, endColumnIndex: colIdx + 1 };
+    }
+    function timeFormat(pattern) {
+      return { userEnteredFormat: { numberFormat: { type: 'TIME', pattern } } };
+    }
+
+    const requests = [
+      { repeatCell: { range: colRange(startTimeCol), cell: timeFormat('h:mm:ss AM/PM'),  fields: 'userEnteredFormat.numberFormat' } },
+      { repeatCell: { range: colRange(runTimeCol),   cell: timeFormat('[h]:mm:ss'),       fields: 'userEnteredFormat.numberFormat' } },
+      ...durationCols.map(c => ({
+        repeatCell: { range: colRange(c), cell: timeFormat('[m]:ss'), fields: 'userEnteredFormat.numberFormat' },
+      })),
+    ];
+
+    await sheets.spreadsheets.batchUpdate({ spreadsheetId, requestBody: { requests } });
+    console.log(`[Sheets] ${timestamp()} Column formats applied`);
+  } catch (err) {
+    console.warn(`[Sheets] ${timestamp()} Could not apply column formats: ${err.message}`);
+  }
 }
 
 module.exports = { appendShowToSheet };

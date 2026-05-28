@@ -13,8 +13,8 @@
 
   let nextCueDisplay = $derived(() => {
     const { nextCueName, nextCueNumber } = progressData;
-    if (!nextCueName && !nextCueNumber) return '—';
-    return nextCueNumber ? `${nextCueNumber} — ${nextCueName}` : nextCueName;
+    if (!nextCueName && !nextCueNumber) return '-';
+    return nextCueNumber ? `${nextCueNumber} - ${nextCueName}` : nextCueName;
   });
 
   let pollTimer = null;

@@ -30,12 +30,13 @@
     {
       "id": "A3_SCENES",
       "label": "Act 3",
-      "scenes": ["3A", "3B", "3C", "3D", "3E"]
+      "scenes": ["3A", "3B", "3C", "3D", "3E", "3F"]
     },
     {
       "id": "A4_SCENES",
       "label": "Act 4",
       "scenes": ["4A", "4B", "4C", "4D", "4E", "4F"]
     }
-  ]
+  ],
+  "staticScenes": ["1.1", "1.2", "Entr'acte 1", "2 Finale", "Entr'acte 2", "Entr'acte 3", "4 Finale", "Entr'acte 4", "5.1", "5.2", "5.3", "Encore"]
 }

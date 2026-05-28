@@ -1,5 +1,5 @@
 <script>
-  import { formatTime, formatRunTime, actorImageUrl } from '../lib/format.js';
+  import { formatTime, formatRunTime, formatDurationReport, actorImageUrl } from '../lib/format.js';
   import { api } from '../lib/api.js';
 
   let { show, tracks, actors, acts, ondeleted } = $props();
@@ -105,7 +105,11 @@
         {#if actScenes.length > 0}
           <div class="history-act-row">
             <span class="history-act-label">{act.label}</span>
-            <span class="history-scene-sequence">{actScenes.map(e => e.scene_name).join(' → ')}</span>
+            <span class="history-scene-sequence">
+              {#each actScenes as entry, i}
+                {entry.scene_name}{#if entry.duration_ms != null}<span class="history-scene-dur">{formatDurationReport(entry.duration_ms)}</span>{/if}{#if i < actScenes.length - 1} → {/if}
+              {/each}
+            </span>
           </div>
         {/if}
       {/each}

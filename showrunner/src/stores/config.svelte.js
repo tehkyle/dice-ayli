@@ -2,6 +2,7 @@ export const configData = $state({
   actors: [],
   characterTracks: [],
   acts: [],
+  staticScenes: [],
   loaded: false,
 });
 
@@ -12,5 +13,6 @@ export async function loadConfig() {
   configData.actors = [...cfg.actors].sort((a, b) => a.name.localeCompare(b.name));
   configData.characterTracks = cfg.characterTracks;
   configData.acts = (cfg.acts || []).filter(a => a.scenes && a.scenes.length > 0);
+  configData.staticScenes = cfg.staticScenes || [];
   configData.loaded = true;
 }

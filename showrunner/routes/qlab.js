@@ -13,10 +13,25 @@ const PLAYHEAD_SCRIPT = `tell application "QLab"
   tell front workspace
     try
       set pos to playback position of front cue list
-      if pos is missing value then
-        return ""
+      if pos is missing value then return ""
+      set cNum to q number of pos as text
+      set cName to q name of pos as text
+      if cName is "" then
+        set cType to q type of pos as text
+        try
+          set tgt to cue target of pos
+          set tgtName to q name of tgt as text
+          if tgtName is "" then set tgtName to q number of tgt as text
+          if tgtName is not "" then
+            set cName to cType & " " & tgtName
+          else
+            set cName to cType
+          end if
+        on error
+          set cName to cType
+        end try
       end if
-      return (q number of pos as text) & "||" & (q name of pos)
+      return cNum & "||" & cName
     on error errMsg
       return "ERR:" & errMsg
     end try
@@ -46,9 +61,10 @@ router.get('/playhead', (req, res) => {
     const raw = stdout.trim();
     console.log(`[QLab] playhead — err: ${err?.message || 'none'} | stdout: "${raw}" | stderr: "${stderr?.trim()}"`);
     if (err || !raw || raw.startsWith('ERR:')) return res.json({ cueName: '', cueNumber: '' });
-    const idx = raw.indexOf('||');
-    const cueNumber = idx >= 0 ? raw.slice(0, idx)  : '';
-    const cueName   = idx >= 0 ? raw.slice(idx + 2) : raw;
+    const idx          = raw.indexOf('||');
+    const cueNumberRaw = idx >= 0 ? raw.slice(0, idx)  : '';
+    const cueName      = idx >= 0 ? raw.slice(idx + 2) : raw;
+    const cueNumber    = cueNumberRaw === '-' ? '' : cueNumberRaw;
     res.json({ cueName, cueNumber });
   });
 });

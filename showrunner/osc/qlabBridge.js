@@ -213,7 +213,7 @@ async function checkQLab(trackIds) {
   await ensureConnected();
 
   return new Promise((resolve) => {
-    let reachable = connected; // if we connected, QLab is reachable
+    let reachable = false; // only true when QLab actually replies — not just "we think we're connected"
     let finished  = false;
     const found   = new Set();
 
@@ -221,6 +221,7 @@ async function checkQLab(trackIds) {
       if (finished) return;
       finished = true;
       replyBus.off('reply', onReply);
+      if (!reachable) connected = false; // stale/failed session — force fresh reconnect next time
       resolve({
         reachable,
         missingVars: reachable ? trackIds.filter(id => !found.has(id)) : [...trackIds],
@@ -339,9 +340,24 @@ function startReceiver(db, io) {
         const scenesPlayed = db.data.scene_log
           .filter(e => e.show_id === showId)
           .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-        appendShowToSheet(show, performanceNumber, castAssignments, scenesPlayed).catch(err => {
-          console.error(`[Sheets ERR] ${timestamp()} ${err.message}`);
+
+        // Compute and persist duration_ms for each scene now that all timestamps are known
+        const endTime = new Date(show.ended_at);
+        scenesPlayed.forEach((entry, i) => {
+          const next = scenesPlayed[i + 1];
+          entry.duration_ms = (next ? new Date(next.timestamp) : endTime) - new Date(entry.timestamp);
         });
+        db.write();
+
+        appendShowToSheet(show, performanceNumber, castAssignments, scenesPlayed)
+          .then(result => {
+            if (result && !result.success && io) {
+              io.emit('sheets_error');
+            }
+          })
+          .catch(err => {
+            console.error(`[Sheets ERR] ${timestamp()} ${err.message}`);
+          });
       } catch (err) {
         console.error(`[Sheets ERR] ${timestamp()} ${err.message}`);
       }

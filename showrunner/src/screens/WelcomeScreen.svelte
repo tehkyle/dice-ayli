@@ -4,7 +4,7 @@
   import { formatDate } from '../lib/format.js';
   import { nav } from '../stores/screen.svelte.js';
   import { showData } from '../stores/show.svelte.js';
-  import { loadConfig, configData } from '../stores/config.svelte.js';
+  import { loadConfig } from '../stores/config.svelte.js';
   import { initScenesFromActs } from '../stores/scenes.svelte.js';
   import { initCastFromTracks } from '../stores/cast.svelte.js';
   import SettingsBadge from '../components/SettingsBadge.svelte';
@@ -61,8 +61,9 @@
 
       await loadConfig();
 
-      initScenesFromActs(configData.acts);
-      initCastFromTracks(configData.characterTracks);
+      const { characterTracks, acts } = await import('../stores/config.svelte.js').then(m => m.configData);
+      initScenesFromActs(acts);
+      initCastFromTracks(characterTracks);
 
       nav.screen = 'scenes';
     } catch {
