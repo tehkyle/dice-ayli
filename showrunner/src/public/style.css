@@ -1384,3 +1384,16 @@ body.history-page {
   justify-content: center;
   padding: 14px 32px;
 }
+
+/* ── App version label ───────────────────────────────────────────── */
+.app-version {
+  position: fixed;
+  bottom: 10px;
+  right: 14px;
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  opacity: 0.5;
+  pointer-events: none;
+  user-select: none;
+  letter-spacing: 0.03em;
+}

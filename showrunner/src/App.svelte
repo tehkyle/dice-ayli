@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { nav } from './stores/screen.svelte.js';
   import { openModal } from './stores/modal.svelte.js';
+  import { api } from './lib/api.js';
 
   import HistoryScreen from './screens/HistoryScreen.svelte';
   import WelcomeScreen from './screens/WelcomeScreen.svelte';
@@ -12,7 +13,9 @@
   import SummaryScreen from './screens/SummaryScreen.svelte';
   import SheetsModal from './components/SheetsModal.svelte';
 
-  onMount(() => {
+  let appVersion = $state('');
+
+  onMount(async () => {
     if (window.location.pathname.startsWith('/history')) {
       nav.screen = 'history';
       return;
@@ -22,6 +25,11 @@
       history.replaceState({}, '', window.location.pathname);
       openModal();
     }
+
+    try {
+      const { version } = await api.getVersion();
+      appVersion = version;
+    } catch {}
   });
 </script>
 
@@ -46,3 +54,7 @@
 {/if}
 
 <SheetsModal />
+
+{#if appVersion}
+  <div class="app-version">v{appVersion}</div>
+{/if}

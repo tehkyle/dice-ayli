@@ -23,6 +23,10 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/history', (_req, res) => res.sendFile(path.join(__dirname, 'public/index.html')));
 
+app.get('/api/version', (_req, res) => {
+  res.json({ version: require('./package.json').version });
+});
+
 app.use('/api/shows',  showsRouter);
 app.use('/api/config', configRouter);
 app.use('/api/qlab',   qlabRouter);

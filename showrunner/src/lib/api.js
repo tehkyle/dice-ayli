@@ -15,6 +15,8 @@ export const api = {
   getPlayhead:      ()          => json('GET',    '/api/qlab/playhead'),
   postGo:           ()          => fetch('/api/qlab/go', { method: 'POST' }),
 
+  getVersion:       ()          => json('GET',    '/api/version'),
+
   getAuthStatus:    ()          => json('GET',    '/api/auth/google/status'),
   deleteAuth:       ()          => fetch('/api/auth/google', { method: 'DELETE' }),
   getSheetsConfig:  ()          => json('GET',    '/api/config/sheets'),
