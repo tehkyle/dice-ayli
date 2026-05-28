@@ -32,8 +32,8 @@
       qlabMissing = missingVars ?? [];
 
       if (!reachable) {
-        qlabText = 'QLab offline — cast will save locally only';
-        beginDisabled = false;
+        qlabText = 'QLab offline — connection required to begin';
+        beginDisabled = true;
         showRetry = true;
       } else if (qlabMissing.length) {
         qlabText = 'QLab connected — cues missing';

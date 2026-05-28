@@ -229,13 +229,21 @@ async function checkQLab(trackIds) {
     }
 
     function onReply(address, args) {
-      reachable = true;
-      if (!address.includes('/cue/')) return;
+      if (!address.includes('/cue/')) {
+        reachable = true;
+        return;
+      }
       try {
         const body = JSON.parse(args[0]);
-        if (body?.status === 'ok') {
-          for (const id of trackIds) {
-            if (address.includes(`/cue/${id}/`)) found.add(id);
+        if (body?.status === 'denied') {
+          // Session not authenticated — reset so ensureConnected() re-sends the passcode next time
+          connected = false;
+        } else {
+          reachable = true;
+          if (body?.status === 'ok') {
+            for (const id of trackIds) {
+              if (address.includes(`/cue/${id}/`)) found.add(id);
+            }
           }
         }
       } catch (_) {}
