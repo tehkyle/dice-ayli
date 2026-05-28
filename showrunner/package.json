@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "dotenv": "^16.4.5",
+    "electron-updater": "^6.8.3",
     "express": "^4.19.2",
     "googleapis": "^144.0.0",
     "node-osc": "^9.1.0",
@@ -36,12 +37,8 @@
     "mac": {
       "icon": "build/icon.icns",
       "target": [
-        {
-          "target": "dmg",
-          "arch": [
-            "arm64"
-          ]
-        }
+        { "target": "dmg", "arch": ["arm64"] },
+        { "target": "zip", "arch": ["arm64"] }
       ],
       "category": "public.app-category.productivity",
       "identity": null
@@ -78,6 +75,11 @@
     ],
     "directories": {
       "output": "dist"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "tehkyle",
+      "repo": "dice-ayli"
     }
   }
 }

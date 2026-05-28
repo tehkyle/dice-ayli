@@ -101,7 +101,7 @@
   <QlabStatus reachable={qlabReachable} missingVars={qlabMissing} statusText={qlabText} />
   <div class="screen-actions">
     <button class="btn btn-primary btn-xl" disabled={beginDisabled || beginning} onclick={begin}>
-      {beginning ? 'Starting…' : 'Begin Cast Entry'}
+      {beginning ? 'Starting…' : 'Begin Show'}
     </button>
     {#if showRetry}
       <button class="btn btn-secondary" onclick={checkQlab}>Retry QLab check</button>

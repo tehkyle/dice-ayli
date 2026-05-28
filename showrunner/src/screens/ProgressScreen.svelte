@@ -34,6 +34,13 @@
     setTimeout(() => { going = false; }, 800);
   }
 
+  function handleKeydown(e) {
+    if (e.code === 'Space' && !going && e.target === document.body) {
+      e.preventDefault();
+      go();
+    }
+  }
+
   onMount(() => {
 
     const socket = getSocket();
@@ -60,6 +67,8 @@
     socket.off('show_ended');
   });
 </script>
+
+<svelte:window onkeydown={handleKeydown} />
 
 <div class="screen-inner">
   <h2 class="screen-title">Show In Progress</h2>

@@ -49,11 +49,12 @@ jobs:
       # electron-builder runs scripts/afterPack.js between packing the .app and sealing
       # the DMG — that hook ad-hoc signs the app on the local filesystem where codesign
       # works reliably, before the DMG is created.
-      - name: Build and sign DMG
+      # Builds both DMG (installer) and ZIP (used by electron-updater for in-place updates).
+      - name: Build DMG + ZIP
         working-directory: showrunner
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-        run: npx electron-builder --mac dmg --publish never
+        run: npx electron-builder --mac --publish never
 
       # Zip the QLab show folder (excludes backup files, DS_Store, Icon).
       - name: Zip QLab show files
@@ -70,5 +71,7 @@ jobs:
           generate_release_notes: true
           files: |
             showrunner/dist/*.dmg
+            showrunner/dist/*.zip
+            showrunner/dist/latest-mac.yml
             qlab-show-files.zip
 

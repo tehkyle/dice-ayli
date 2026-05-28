@@ -1,4 +1,5 @@
 const { app, BrowserWindow, utilityProcess, dialog, globalShortcut } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const http = require('http');
 
@@ -77,9 +78,55 @@ function createWindow() {
   mainWindow.on('closed', () => { mainWindow = null; });
 }
 
+function setupUpdater() {
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.logger = { info: log, warn: log, error: log, debug: () => {} };
+
+  autoUpdater.on('update-available', (info) => {
+    dialog.showMessageBox(mainWindow, {
+      type:      'info',
+      title:     'Update available',
+      message:   `Version ${info.version} is available`,
+      detail:    'Download now? It will install when you quit the app.',
+      buttons:   ['Download', 'Later'],
+      defaultId: 0,
+      cancelId:  1,
+    }).then(({ response }) => {
+      if (response === 0) autoUpdater.downloadUpdate();
+    });
+  });
+
+  autoUpdater.on('update-downloaded', () => {
+    dialog.showMessageBox(mainWindow, {
+      type:      'info',
+      title:     'Update ready',
+      message:   'Update downloaded',
+      detail:    'Quit and install now, or it will apply on next launch.',
+      buttons:   ['Quit & install', 'Later'],
+      defaultId: 0,
+      cancelId:  1,
+    }).then(({ response }) => {
+      if (response === 0) autoUpdater.quitAndInstall();
+    });
+  });
+
+  autoUpdater.on('error', (err) => {
+    log(`[Updater] ${err.message}`);
+  });
+
+  // Check after a short delay so startup isn't blocked
+  setTimeout(() => {
+    autoUpdater.checkForUpdates().catch(err => log(`[Updater] Check failed: ${err.message}`));
+  }, 5000);
+}
+
 app.whenReady().then(() => {
   startServer();
-  waitForServer(createWindow);
+  waitForServer(() => {
+    createWindow();
+    setupUpdater();
+  });
 
   globalShortcut.register('CommandOrControl+Alt+I', () => {
     if (mainWindow) mainWindow.webContents.toggleDevTools();

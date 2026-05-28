@@ -5,23 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dacha DICE — Cast management</title>
   <meta name="description" content="Cast management and QLab OSC bridge for As You Like It. Download the macOS app." />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
-  <!-- ── Hero ──────────────────────────────────────────────────────── -->
   <header class="hero">
     <div class="hero-inner">
-      <div class="wordmark">Dacha DICE: As You Like It</div>
-      <p class="tagline">Cast management &amp; QLab OSC bridge<br>for interactive theatre</p>
+      <img src="dacha-logo-vector.png" alt="Dacha" class="hero-logo" />
+      <div class="wordmark">DICE: As You Like It</div>
+      <p class="tagline">Cast management &amp; QLab OSC bridge</p>
 
       <div class="download-wrap">
         <a id="btn-download" class="btn-download" href="#">
           <span class="dl-icon">↓</span>
           <span class="dl-label">Download for Mac</span>
         </a>
-        <p class="dl-note">macOS 12 Monterey or later &nbsp;·&nbsp; Apple Silicon &amp; Intel</p>
+        <p class="dl-note">macOS 12 or later &nbsp;·&nbsp; Apple Silicon &amp; Intel</p>
         <a id="btn-qlab" class="btn-qlab" href="#">
           <span class="dl-icon">↓</span>
           <span class="dl-label">Download QLab Show Files</span>
@@ -32,160 +31,38 @@
 
   <main>
 
-    <!-- ── First launch ───────────────────────────────────────────── -->
-    <section class="card-section">
-      <h2 class="section-title">First launch</h2>
-      <div class="steps">
-
-        <div class="step">
-          <div class="step-num">1</div>
-          <div class="step-body">
-            <h3>Download &amp; move to Applications</h3>
-            <p>Open the <code>.dmg</code>, drag <strong>Dacha DICE: AYLI</strong> into your Applications folder, then eject the disk image.</p>
-          </div>
-        </div>
-
-        <div class="step">
-          <div class="step-num">2</div>
-          <div class="step-body">
-            <h3>Bypass Gatekeeper</h3>
-            <p>The app is not notarized by Apple, so macOS will warn on first open. <strong>Right-click</strong> the app icon → <strong>Open</strong> → click <strong>Open</strong> in the dialog. You only need to do this once.</p>
-            <p>If macOS says the app is <em>"damaged"</em> instead of showing an Open button, run this in Terminal, then open normally:</p>
-            <pre><code>xattr -dr com.apple.quarantine "/Applications/Dacha-Dice-AYLI.app"</code></pre>
-          </div>
-        </div>
-
-        <div class="step">
-          <div class="step-num">3</div>
-          <div class="step-body">
-            <h3>Connect Google Sheets</h3>
-            <p>Click the <strong>gear icon</strong> in the top-right corner of the welcome screen. Connect your Google account, pick the spreadsheet, and choose the tab to write show reports to. The gear badge turns green when configured.</p>
-          </div>
-        </div>
-
+    <details class="help-section">
+      <summary class="help-summary">First launch</summary>
+      <div class="help-body">
+        <ol class="help-steps">
+          <li>Open the <code>.dmg</code>, drag the app to Applications.</li>
+          <li>Try to open the app — macOS will block it the first time. Open <strong>System Settings → Privacy &amp; Security</strong>, scroll down, and click <strong>Open Anyway</strong>. Confirm in the dialog that follows. Only needed once.</li>
+          <li>Click the <strong>gear icon</strong> → connect Google account → pick spreadsheet and tab. Badge turns green when ready.</li>
+        </ol>
       </div>
-    </section>
+    </details>
 
-    <!-- ── Show day flow ──────────────────────────────────────────── -->
-    <section class="card-section">
-      <h2 class="section-title">Show day</h2>
-      <div class="steps">
-
-        <div class="step">
-          <div class="step-num">1</div>
-          <div class="step-body">
-            <h3>Open the app &amp; check QLab</h3>
-            <p>The welcome screen shows a QLab status indicator. Wait for it to turn green — this confirms the app has connected to the QLab workspace. If it stays orange, check that QLab is open and on the same machine.</p>
-          </div>
-        </div>
-
-        <div class="step">
-          <div class="step-num">2</div>
-          <div class="step-body">
-            <h3>Begin cast entry</h3>
-            <p>Click <strong>Begin Cast Entry</strong>. The app shows today's date and performance number automatically.</p>
-          </div>
-        </div>
-
-        <div class="step">
-          <div class="step-num">3</div>
-          <div class="step-body">
-            <h3>Select scenes</h3>
-            <p>Check which scenes are running in each act. Use <strong>Fix Order</strong> to set a specific sequence; leave it off for random order. Grayed-out scenes are not available to select.</p>
-          </div>
-        </div>
-
-        <div class="step">
-          <div class="step-num">4</div>
-          <div class="step-body">
-            <h3>Assign cast</h3>
-            <p>Use the dropdowns to assign an actor to each character track. The app prevents duplicate assignments and highlights conflicts in red. Use <strong>Randomize unfilled</strong> if needed.</p>
-          </div>
-        </div>
-
-        <div class="step">
-          <div class="step-num">5</div>
-          <div class="step-body">
-            <h3>Lock &amp; send to QLab</h3>
-            <p>Review the summary, then click <strong>Lock &amp; Send to QLab</strong>. The app writes actor names into QLab's memo cues and fires the <code>CAST_CONFIRMED</code> cue. A green banner confirms QLab was notified.</p>
-          </div>
-        </div>
-
-        <div class="step">
-          <div class="step-num">6</div>
-          <div class="step-body">
-            <h3>After the show</h3>
-            <p>When QLab fires the show-end cue, Dacha DICE: AYLI automatically appends a row to the configured Google Sheet with the date, performance number, start time, run time, full cast, and scenes played in each act.</p>
-          </div>
-        </div>
-
+    <details class="help-section">
+      <summary class="help-summary">Show day</summary>
+      <div class="help-body">
+        <ol class="help-steps">
+          <li>Open the app. Wait for the QLab status indicator to turn green.</li>
+          <li>Click <strong>Begin Show</strong>.</li>
+          <li>Select scenes for each act. Use <strong>Fix Order</strong> to set a specific sequence.</li>
+          <li>Assign actors to each track. Conflicts highlight red. Use <strong>Randomize unfilled</strong> if needed.</li>
+          <li>Review, then click <strong>Lock &amp; Send to QLab</strong>. Green banner = QLab notified.</li>
+          <li>Use the <strong>GO</strong> button (or spacebar) to advance QLab during the show. The next cue is shown above it.</li>
+          <li>After the show, a row is automatically written to your Google Sheet.</li>
+        </ol>
       </div>
-    </section>
-
-    <!-- ── Two-column: History + Troubleshooting ─────────────────── -->
-    <div class="two-col">
-
-      <section class="card-section">
-        <h2 class="section-title">Show history</h2>
-        <p>Every performance is saved locally. Click <strong>View show history →</strong> on the welcome screen to browse past shows. You can correct cast assignments after the fact using the edit button on any card.</p>
-      </section>
-
-      <section class="card-section">
-        <h2 class="section-title">Troubleshooting</h2>
-        <dl class="faq">
-          <dt>QLab status stays orange</dt>
-          <dd>Make sure QLab is open, the workspace name in <code>config.json</code> matches, and the passcode is correct.</dd>
-          <dt>Google Sheets badge stays red</dt>
-          <dd>Open the gear icon and reconnect your Google account. Check that <code>GOOGLE_OAUTH_CLIENT_ID</code> and <code>GOOGLE_OAUTH_CLIENT_SECRET</code> are set in the app's <code>.env</code>.</dd>
-          <dt>Row not appearing in the sheet</dt>
-          <dd>Check that the signed-in Google account has Editor access to the spreadsheet. Also confirm the selected tab name hasn't been renamed.</dd>
-          <dt>App won't open on macOS</dt>
-          <dd>Right-click the app icon → Open. If System Settings blocks it, go to <strong>Privacy &amp; Security</strong> and click <strong>Open Anyway</strong>.</dd>
-        </dl>
-      </section>
-
-    </div>
-
-    <!-- ── Tech setup ─────────────────────────────────────────────── -->
-    <section class="card-section">
-      <h2 class="section-title">Technical setup <span class="section-sub">for production team</span></h2>
-      <div class="tech-grid">
-
-        <div class="tech-block">
-          <h3>QLab requirements</h3>
-          <p>The workspace must have the following memo cues. The app targets them by cue number — names don't matter.</p>
-          <table class="cue-table">
-            <thead><tr><th>Cue number</th><th>Purpose</th></tr></thead>
-            <tbody>
-              <tr><td><code>Track_1</code> – <code>Track_6</code></td><td>Stores actor name per character track</td></tr>
-              <tr><td><code>A2_SCENES</code></td><td>Stores available scene IDs for Act 2</td></tr>
-              <tr><td><code>A3_SCENES</code></td><td>Stores available scene IDs for Act 3</td></tr>
-              <tr><td><code>A4_SCENES</code></td><td>Stores available scene IDs for Act 4</td></tr>
-              <tr><td><code>CAST_CONFIRMED</code></td><td>Fired after cast is locked — triggers show start</td></tr>
-            </tbody>
-          </table>
-          <p class="tech-note">OSC: app sends to port <strong>53000</strong>, receives on <strong>53001</strong>. Set workspace name and passcode in <code>config.json</code>.</p>
-        </div>
-
-        <div class="tech-block">
-          <h3>Google Sheets setup</h3>
-          <p>You need a Google Cloud project with the Sheets and Drive APIs enabled, and an OAuth2 client. Full instructions are in <a href="https://github.com/tehkyle/dice-ayli/blob/main/showrunner/GOOGLE_SETUP.md" target="_blank" rel="noopener"><code>GOOGLE_SETUP.md</code></a> in the repo.</p>
-          <p>The Client ID and Secret go in the app's <code>.env</code> file (or as GitHub Secrets if building from source). Everything else — which account, which spreadsheet, which tab — is configured at runtime via the gear icon.</p>
-          <p class="tech-note">The Google Sheet row format is:<br>
-            <code>Date · Perf # · Start · Run time · [cast per track] · [scenes per act]</code></p>
-        </div>
-
-      </div>
-    </section>
+    </details>
 
   </main>
 
   <footer class="site-footer">
-    <a href="https://github.com/tehkyle/dice-ayli" target="_blank" rel="noopener">View on GitHub</a>
+    <a href="https://github.com/tehkyle/dice-ayli" target="_blank" rel="noopener">GitHub</a>
     <span class="footer-sep">·</span>
     <a href="https://github.com/tehkyle/dice-ayli/releases" target="_blank" rel="noopener">All releases</a>
-    <span class="footer-sep">·</span>
-    <a href="https://github.com/tehkyle/dice-ayli/blob/main/showrunner/GOOGLE_SETUP.md" target="_blank" rel="noopener">Google Sheets setup guide</a>
   </footer>
 
   <script src="app.js"></script>
