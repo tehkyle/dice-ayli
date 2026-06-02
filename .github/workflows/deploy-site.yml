@@ -33,7 +33,12 @@ jobs:
         uses: actions/configure-pages@v5
 
       - name: Inject QLab download URL
-        run: sed -i "s|__QLAB_DOWNLOAD_URL__|${{ vars.QLAB_DOWNLOAD_URL }}|g" site/app.js
+        run: |
+          python3 -c "
+          import pathlib
+          f = pathlib.Path('site/app.js')
+          f.write_text(f.read_text().replace('__QLAB_DOWNLOAD_URL__', '${{ vars.QLAB_DOWNLOAD_URL }}'))
+          "
 
       - name: Upload site artifact
         uses: actions/upload-pages-artifact@v3
