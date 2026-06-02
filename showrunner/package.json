@@ -1,6 +1,6 @@
 {
   "name": "showrunner",
-  "version": "1.0.25",
+  "version": "1.0.26",
   "description": "Cast management and QLab OSC bridge for interactive theatre",
   "main": "electron-main.js",
   "scripts": {
