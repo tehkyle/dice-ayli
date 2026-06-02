@@ -56,14 +56,6 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         run: npx electron-builder --mac --publish never
 
-      # Zip the QLab show folder (excludes backup files, DS_Store, Icon).
-      - name: Zip QLab show files
-        run: |
-          zip -r qlab-show-files.zip qlab/ \
-            -x "*backup*" \
-            -x "*/.DS_Store" \
-            -x "*/Icon"
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -73,5 +65,4 @@ jobs:
             showrunner/dist/*.dmg
             showrunner/dist/*.zip
             showrunner/dist/latest-mac.yml
-            qlab-show-files.zip
 

@@ -32,6 +32,9 @@ jobs:
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
+      - name: Inject QLab download URL
+        run: sed -i "s|__QLAB_DOWNLOAD_URL__|${{ vars.QLAB_DOWNLOAD_URL }}|g" site/app.js
+
       - name: Upload site artifact
         uses: actions/upload-pages-artifact@v3
         with:
