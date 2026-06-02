@@ -45,9 +45,10 @@ async function appendShowToSheet(show, performanceNumber, castAssignments, scene
     return null; // not configured — no error to surface
   }
 
-  const sheetsConfig  = readSheetsConfig();
-  const spreadsheetId = sheetsConfig.spreadsheetId;
-  const sheetTabName  = sheetsConfig.sheetTabName || 'Sheet1';
+  const sheetsConfig     = readSheetsConfig();
+  const spreadsheetId    = sheetsConfig.spreadsheetId;
+  const sheetTabName     = sheetsConfig.sheetTabName || 'Sheet1';
+  const showrunnerEmail  = sheetsConfig.userEmail || '';
 
   if (!spreadsheetId) {
     console.warn('[Sheets] No spreadsheetId configured — skipping export. Select a spreadsheet in the config modal.');
@@ -118,13 +119,14 @@ async function appendShowToSheet(show, performanceNumber, castAssignments, scene
     showDate ? `'${showDate}` : '',
     startTime,
     runTime,
+    showrunnerEmail,
     ...castColumns,
     ...actSceneColumns,
     ...staticSceneColumns,
   ];
 
   // Human-readable TSV for clipboard fallback — no Sheets tricks, durations as m:ss
-  const tsvRow = [showDate, startTime, runTime, ...castColumns, ...actSceneColumnsTsv, ...staticSceneColumnsTsv].join('\t');
+  const tsvRow = [showDate, startTime, runTime, showrunnerEmail, ...castColumns, ...actSceneColumnsTsv, ...staticSceneColumnsTsv].join('\t');
 
   try {
     // Auto-write header row + set column formats if A1 is empty
@@ -141,7 +143,7 @@ async function appendShowToSheet(show, performanceNumber, castAssignments, scene
         for (const sceneName of act.scenes) sceneHeaders.push(sceneName);
       }
       const staticHeaders = config.staticScenes || [];
-      const headerRow = ['Date', 'Start Time', 'Run Time', ...trackHeaders, ...sceneHeaders, ...staticHeaders];
+      const headerRow = ['Date', 'Start Time', 'Run Time', 'Showrunner', ...trackHeaders, ...sceneHeaders, ...staticHeaders];
 
       await sheets.spreadsheets.values.update({
         spreadsheetId,
@@ -190,6 +192,7 @@ async function applyColumnFormats(sheets, spreadsheetId, sheetTabName, config) {
     col++;                                             // Date
     const startTimeCol = col++;                        // Start Time
     const runTimeCol   = col++;                        // Run Time
+    col++;                                             // Showrunner
     col += (config.characterTracks || []).length;      // Cast columns
 
     const durationCols = [];
