@@ -3,10 +3,14 @@ const router = express.Router();
 const { getDb, nextId } = require('../db/database');
 const { sendCastToQLab, sendScenesToQLab, setActiveShow } = require('../osc/qlabBridge');
 
+function localDateString(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 // POST /api/shows — create a new show record
 router.post('/', (req, res) => {
   const db = getDb();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateString();
   const { notes } = req.body || {};
 
   const id = nextId(db.data.shows);
@@ -99,7 +103,7 @@ router.get('/', (req, res) => {
 // GET /api/shows/today — today's shows only
 router.get('/today', (req, res) => {
   const db = getDb();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateString();
   const sorted = [...db.data.shows].sort((a, b) => a.id - b.id);
   const result = sorted
     .map((show, i) => ({ ...show, performance_number: i + 1 }))
