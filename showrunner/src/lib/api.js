@@ -6,14 +6,19 @@ const json = (method, path, body) => fetch(path, {
 export const api = {
   getConfig:        ()          => json('GET',    '/api/config'),
   getShows:         ()          => json('GET',    '/api/shows'),
+  getActiveShow:    ()          => json('GET',    '/api/shows/active'),
   createShow:       ()          => json('POST',   '/api/shows', {}),
   deleteShow:       (id)        => fetch(`/api/shows/${id}`, { method: 'DELETE' }),
+  endShow:          (id)        => fetch(`/api/shows/${id}/end`,    { method: 'POST' }),
+  cancelShow:       (id)        => fetch(`/api/shows/${id}/cancel`, { method: 'POST' }),
   lockCast:         (id, body)  => json('POST',   `/api/shows/${id}/cast`, body),
   saveCast:         (id, cast)  => json('POST',   `/api/shows/${id}/cast`, { cast }),
 
   getQlabStatus:    ()          => json('GET',    '/api/qlab/status'),
   getPlayhead:      ()          => json('GET',    '/api/qlab/playhead'),
   postGo:           ()          => fetch('/api/qlab/go', { method: 'POST' }),
+  panicAll:         ()          => fetch('/api/qlab/panic', { method: 'POST' }),
+  reconnectQLab:    (body)      => json('POST',   '/api/qlab/reconnect', body ?? {}),
 
   getVersion:       ()          => json('GET',    '/api/version'),
 

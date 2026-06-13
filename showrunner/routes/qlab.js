@@ -5,7 +5,7 @@ const fs      = require('fs');
 const os      = require('os');
 const { exec } = require('child_process');
 
-const { checkQLab, sendGo } = require('../osc/qlabBridge');
+const { checkQLab, sendGo, sendPanicAll, reconnectQLab, setLastKnownPlayhead } = require('../osc/qlabBridge');
 
 // Returns "cueNumber||cueName" for the playhead of the front (active) cue list —
 // exactly what QLab's Go button would fire next.
@@ -65,6 +65,7 @@ router.get('/playhead', (req, res) => {
     const cueNumberRaw = idx >= 0 ? raw.slice(0, idx)  : '';
     const cueName      = idx >= 0 ? raw.slice(idx + 2) : raw;
     const cueNumber    = cueNumberRaw === '-' ? '' : cueNumberRaw;
+    setLastKnownPlayhead(cueNumber);
     res.json({ cueName, cueNumber });
   });
 });
@@ -74,6 +75,22 @@ router.post('/go', async (req, res) => {
   try {
     await sendGo();
     res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/qlab/panic
+router.post('/panic', (req, res) => {
+  sendPanicAll();
+  res.json({ sent: true });
+});
+
+// POST /api/qlab/reconnect
+router.post('/reconnect', async (req, res) => {
+  try {
+    const status = await reconnectQLab(req.body?.cueNumber);
+    res.json({ status });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

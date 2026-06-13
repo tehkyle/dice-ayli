@@ -1205,6 +1205,40 @@ body.history-page {
   color: var(--warn);
 }
 
+.btn-qlab-reconnect {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 3px 10px;
+  margin-left: auto;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.btn-qlab-reconnect:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.btn-qlab-reconnect:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-qlab-reconnect.ok {
+  border-color: var(--success);
+  color: var(--success);
+}
+
+.btn-qlab-reconnect.failed {
+  border-color: var(--warn);
+  color: var(--warn);
+}
+
 .progress-section-label {
   font-size: 0.75rem;
   font-weight: 700;
@@ -1386,6 +1420,65 @@ body.history-page {
 }
 
 /* ── App version label ───────────────────────────────────────────── */
+.progress-show-controls {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.btn-show-control {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 5px 14px;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.btn-show-control.end:hover {
+  border-color: var(--warn);
+  color: var(--warn);
+}
+
+.btn-show-control.restart:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.btn-panic {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  background: var(--danger-bg);
+  border: 1px solid var(--danger);
+  border-radius: 6px;
+  color: var(--danger);
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 8px 16px;
+  text-transform: uppercase;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+}
+
+.btn-panic:hover {
+  background: var(--danger);
+  color: #fff;
+}
+
+.btn-panic.active {
+  background: var(--danger);
+  color: #fff;
+  border-color: var(--danger);
+}
+
 .app-version {
   position: fixed;
   bottom: 10px;

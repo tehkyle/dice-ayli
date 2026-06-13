@@ -5,7 +5,7 @@ const { Server: SocketIO } = require('socket.io');
 const path = require('path');
 
 const { getDb } = require('./db/database');
-const { startReceiver } = require('./osc/qlabBridge');
+const { startReceiver, setActiveShow } = require('./osc/qlabBridge');
 const showsRouter  = require('./routes/shows');
 const configRouter = require('./routes/config');
 const qlabRouter   = require('./routes/qlab');
@@ -35,6 +35,13 @@ app.use('/api/sheets', sheetsRouter);
 
 // Initialize DB on startup
 const db = getDb();
+
+// Restore active show state if the server restarted mid-show
+const midShowShow = db.data.shows.find(s => s.locked_at && !s.ended_at);
+if (midShowShow) {
+  setActiveShow(midShowShow.id);
+  console.log(`[SERVER] Restored active show ID: ${midShowShow.id}`);
+}
 
 // Start OSC receiver (scaffolded for future scene logging / marketing display)
 startReceiver(db, io);

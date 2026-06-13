@@ -16,9 +16,14 @@ replyBus.setMaxListeners(20);
 const oscClient = new Client(QLAB_HOST, QLAB_SEND_PORT);
 
 // Session state — reset if QLab restarts
-let workspaceId   = null;
-let connected     = false;
-let activeShowId  = null; // set when a show is locked, cleared on /show/end
+let workspaceId        = null;
+let connected          = false;
+let activeShowId       = null; // set when a show is locked, cleared on /show/end
+let lastKnownCueNumber = null; // updated on every playhead poll
+
+// Set by startReceiver so endShow() can be called from HTTP routes too
+let _db = null;
+let _io = null;
 
 function timestamp() {
   return new Date().toISOString();
@@ -134,6 +139,33 @@ async function connectQLab() {
 async function ensureConnected() {
   if (!workspaceQualifier()) await discoverWorkspace();
   if (!connected) await connectQLab();
+}
+
+function setLastKnownPlayhead(cueNumber) {
+  if (cueNumber && cueNumber !== '-') lastKnownCueNumber = cueNumber;
+}
+
+function restorePlayhead(cueNumber) {
+  if (!cueNumber) return;
+  const ws = workspaceQualifier();
+  if (!ws) return;
+  const addr = `/workspace/${ws}/playhead/${cueNumber}`;
+  console.log(`[OSC OUT] ${timestamp()} ${addr}`);
+  try { oscClient.send(addr); } catch (err) {
+    console.error(`[OSC ERR] restorePlayhead: ${err.message}`);
+  }
+}
+
+async function reconnectQLab(cueNumber) {
+  connected = false;
+  workspaceId = null;
+  await discoverWorkspace();
+  const status = await connectQLab();
+  if (status === 'ok') {
+    const target = cueNumber || lastKnownCueNumber;
+    if (target) restorePlayhead(target);
+  }
+  return status;
 }
 
 // --- Public API ---
@@ -274,10 +306,57 @@ function setActiveShow(id) {
 }
 
 /**
+ * End the active show: mark ended_at, compute scene durations, write to Sheets,
+ * and emit show_ended over the websocket. Safe to call from both the OSC handler
+ * and HTTP routes.
+ * @param {number|null} showId
+ */
+function endShow(showId) {
+  if (showId == null || !_db) return;
+  activeShowId = null;
+
+  const timeStr = timestamp();
+  if (_io) _io.emit('show_ended', { showId, time: timeStr });
+
+  try {
+    const { appendShowToSheet } = require('../integrations/googleSheets');
+    const show = _db.data.shows.find(s => s.id === showId);
+    if (!show) return;
+    show.ended_at = new Date().toISOString();
+    _db.write();
+
+    const performanceNumber = [..._db.data.shows]
+      .sort((a, b) => a.id - b.id)
+      .findIndex(s => s.id === showId) + 1;
+    const castAssignments = _db.data.cast_assignments.filter(a => a.show_id === showId);
+    const scenesPlayed = _db.data.scene_log
+      .filter(e => e.show_id === showId)
+      .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+    const endTime = new Date(show.ended_at);
+    scenesPlayed.forEach((entry, i) => {
+      const next = scenesPlayed[i + 1];
+      entry.duration_ms = (next ? new Date(next.timestamp) : endTime) - new Date(entry.timestamp);
+    });
+    _db.write();
+
+    appendShowToSheet(show, performanceNumber, castAssignments, scenesPlayed)
+      .then(result => {
+        if (result && !result.success && _io) _io.emit('sheets_error');
+      })
+      .catch(err => console.error(`[Sheets ERR] ${timestamp()} ${err.message}`));
+  } catch (err) {
+    console.error(`[Sheets ERR] ${timestamp()} ${err.message}`);
+  }
+}
+
+/**
  * Start the OSC UDP receiver. Routes /reply/... to replyBus,
  * auto-discovers workspace ID, and handles incoming scene events.
  */
 function startReceiver(db, io) {
+  _db = db;
+  _io = io;
   const server = new Server(QLAB_RECEIVE_PORT, '0.0.0.0');
 
   server.on('message', (msg) => {
@@ -295,10 +374,15 @@ function startReceiver(db, io) {
           }
         } catch (_) {}
       }
-      // If QLab sends 'error' on a cue command, our session may have dropped
+      // Reset session state on error/denied so the next command re-connects
       try {
         const body = JSON.parse(args[0]);
-        if (body?.status === 'error' && address.includes('/cue/')) {
+        if (body?.status === 'denied') {
+          connected = false;
+          workspaceId = null;
+          console.log(`[OSC] Session denied by QLab — will reconnect on next send`);
+          reconnectQLab().catch(() => {});
+        } else if (body?.status === 'error' && address.includes('/cue/')) {
           connected = false;
         }
       } catch (_) {}
@@ -329,46 +413,8 @@ function startReceiver(db, io) {
 
     if (address === '/show/end') {
       const showId = activeShowId;
-      activeShowId = null;
       console.log(`[OSC] Show end received for show ${showId}`);
-      if (io) io.emit('show_ended', { showId, time: timestamp() });
-
-      if (showId == null) return;
-
-      try {
-        const { appendShowToSheet } = require('../integrations/googleSheets');
-        const show = db.data.shows.find(s => s.id === showId);
-        if (!show) return;
-        show.ended_at = new Date().toISOString();
-        db.write();
-        const performanceNumber = [...db.data.shows]
-          .sort((a, b) => a.id - b.id)
-          .findIndex(s => s.id === showId) + 1;
-        const castAssignments = db.data.cast_assignments.filter(a => a.show_id === showId);
-        const scenesPlayed = db.data.scene_log
-          .filter(e => e.show_id === showId)
-          .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-
-        // Compute and persist duration_ms for each scene now that all timestamps are known
-        const endTime = new Date(show.ended_at);
-        scenesPlayed.forEach((entry, i) => {
-          const next = scenesPlayed[i + 1];
-          entry.duration_ms = (next ? new Date(next.timestamp) : endTime) - new Date(entry.timestamp);
-        });
-        db.write();
-
-        appendShowToSheet(show, performanceNumber, castAssignments, scenesPlayed)
-          .then(result => {
-            if (result && !result.success && io) {
-              io.emit('sheets_error');
-            }
-          })
-          .catch(err => {
-            console.error(`[Sheets ERR] ${timestamp()} ${err.message}`);
-          });
-      } catch (err) {
-        console.error(`[Sheets ERR] ${timestamp()} ${err.message}`);
-      }
+      endShow(showId);
     }
   });
 
@@ -388,4 +434,14 @@ async function sendGo() {
   oscClient.send(addr);
 }
 
-module.exports = { sendCastToQLab, sendScenesToQLab, startReceiver, checkQLab, setActiveShow, sendGo };
+async function sendPanicAll() {
+  await ensureConnected();
+  const ws = workspaceQualifier();
+  const addr = ws ? `/workspace/${ws}/panic` : '/panic';
+  console.log(`[OSC OUT] ${timestamp()} ${addr}`);
+  try { oscClient.send(addr); } catch (err) {
+    console.error(`[OSC ERR] sendPanicAll: ${err.message}`);
+  }
+}
+
+module.exports = { sendCastToQLab, sendScenesToQLab, startReceiver, checkQLab, setActiveShow, sendGo, sendPanicAll, reconnectQLab, setLastKnownPlayhead, endShow };
