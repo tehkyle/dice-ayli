@@ -12,7 +12,7 @@ const { checkQLab, sendGo, sendPanicAll, reconnectQLab, setLastKnownPlayhead } =
 const PLAYHEAD_SCRIPT = `tell application "QLab"
   tell front workspace
     try
-      set pos to playback position of front cue list
+      set pos to playback position of cue list "MAIN"
       if pos is missing value then return ""
       set cNum to q number of pos as text
       set cName to q name of pos as text

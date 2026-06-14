@@ -429,7 +429,7 @@ function startReceiver(db, io) {
 async function sendGo() {
   await ensureConnected();
   const ws = workspaceQualifier();
-  const addr = ws ? `/workspace/${ws}/go` : '/go';
+  const addr = ws ? `/workspace/${ws}/cue/MAIN/go` : '/cue/MAIN/go';
   console.log(`[OSC OUT] ${timestamp()} ${addr}`);
   oscClient.send(addr);
 }
