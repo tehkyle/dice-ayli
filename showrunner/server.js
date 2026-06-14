@@ -33,25 +33,19 @@ app.use('/api/qlab',   qlabRouter);
 app.use('/api/auth',   authRouter);
 app.use('/api/sheets', sheetsRouter);
 
-// Initialize DB on startup
 const db = getDb();
 
-// Restore active show state if the server restarted mid-show
 const midShowShow = db.data.shows.find(s => s.locked_at && !s.ended_at);
 if (midShowShow) {
   setActiveShow(midShowShow.id);
   console.log(`[SERVER] Restored active show ID: ${midShowShow.id}`);
 }
 
-// Start OSC receiver (scaffolded for future scene logging / marketing display)
 startReceiver(db, io);
 
-// socket.io — scaffolded for future marketing display phase
 io.on('connection', (socket) => {
   console.log(`[WS] Client connected: ${socket.id}`);
-  socket.on('disconnect', () => {
-    console.log(`[WS] Client disconnected: ${socket.id}`);
-  });
+  socket.on('disconnect', () => console.log(`[WS] Client disconnected: ${socket.id}`));
 });
 
 httpServer.listen(PORT, () => {

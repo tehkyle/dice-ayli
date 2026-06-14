@@ -2,6 +2,8 @@
   "qlabPasscode": 5436,
   "qlabWorkspaceName": "ayli",
   "qlabWorkspaceId": "",
+  "qlabMainCueList": "MAIN",
+  "castConfirmedCue": "CAST_CONFIRMED",
   "actors": [
     { "name": "Adele",  "subtitle": "", "image": "" },
     { "name": "Ben",    "subtitle": "", "image": "" },

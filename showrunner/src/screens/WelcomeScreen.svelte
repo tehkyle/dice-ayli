@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { api } from '../lib/api.js';
-  import { formatDate } from '../lib/format.js';
+  import { formatDate, toIsoDate } from '../lib/format.js';
   import { nav } from '../stores/screen.svelte.js';
   import { showData } from '../stores/show.svelte.js';
   import { loadConfig } from '../stores/config.svelte.js';
@@ -10,8 +10,7 @@
   import SettingsBadge from '../components/SettingsBadge.svelte';
   import QlabStatus from '../components/QlabStatus.svelte';
 
-  const d = new Date();
-  const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const today = toIsoDate();
 
   let qlabReachable = $state(null);
   let qlabMissing = $state([]);

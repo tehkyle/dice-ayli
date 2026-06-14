@@ -4,32 +4,25 @@
 
   let { act } = $props();
 
-  let allChecked = $derived(
-    act.scenes.every(s => (scenesData.selections[act.id] ?? []).includes(s))
-  );
+  let actSelections = $derived(scenesData.selections[act.id] ?? []);
+  let allChecked    = $derived(act.scenes.every(s => actSelections.includes(s)));
 
-  function toggleScene(scene) {
-    const current = scenesData.selections[act.id] ?? [];
-    if (current.includes(scene)) {
-      scenesData.selections[act.id] = current.filter(s => s !== scene);
+  function handleToggleScene(scene) {
+    if (actSelections.includes(scene)) {
+      scenesData.selections[act.id] = actSelections.filter(s => s !== scene);
     } else {
-      scenesData.selections[act.id] = [...current, scene];
+      scenesData.selections[act.id] = [...actSelections, scene];
     }
   }
 
-  function toggleAll() {
-    if (allChecked) {
-      scenesData.selections[act.id] = [];
-    } else {
-      scenesData.selections[act.id] = [...act.scenes];
-    }
+  function handleToggleAll() {
+    scenesData.selections[act.id] = allChecked ? [] : [...act.scenes];
   }
 
-  function toggleOrder() {
+  function handleToggleOrder() {
     const isOrdered = scenesData.ordered[act.id];
     if (!isOrdered) {
-      const checked = (scenesData.selections[act.id] ?? []);
-      scenesData.orderedLists[act.id] = checked.length ? [...checked] : [...act.scenes];
+      scenesData.orderedLists[act.id] = actSelections.length ? [...actSelections] : [...act.scenes];
       scenesData.ordered[act.id] = true;
     } else {
       const orderedSet = new Set(scenesData.orderedLists[act.id] ?? []);
@@ -44,12 +37,12 @@
     <div class="act-label">{act.label}</div>
     <button
       class="btn-rig-toggle {scenesData.ordered[act.id] ? 'active' : ''}"
-      onclick={toggleOrder}
+      onclick={handleToggleOrder}
     >
       {scenesData.ordered[act.id] ? 'Randomize' : 'Fix Order'}
     </button>
     {#if !scenesData.ordered[act.id]}
-      <button class="btn-toggle-all" onclick={toggleAll}>
+      <button class="btn-toggle-all" onclick={handleToggleAll}>
         {allChecked ? 'Deselect all' : 'Select all'}
       </button>
     {/if}
@@ -63,8 +56,8 @@
         <label class="scene-item">
           <input
             type="checkbox"
-            checked={(scenesData.selections[act.id] ?? []).includes(scene)}
-            onchange={() => toggleScene(scene)}
+            checked={actSelections.includes(scene)}
+            onchange={() => handleToggleScene(scene)}
           />
           <span>{scene}</span>
         </label>

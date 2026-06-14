@@ -5,6 +5,7 @@
   import { progressData, appendScene, finalizeLastScene, resetProgress } from '../stores/progress.svelte.js';
   import { getSocket } from '../lib/socket.js';
   import { api } from '../lib/api.js';
+  import { formatCueDisplay } from '../lib/format.js';
   import ProgressSceneItem from '../components/ProgressSceneItem.svelte';
 
   let startTime = $state(
@@ -20,11 +21,7 @@
   let panicking = $state(false);
   let panicTimer = null;
 
-  let nextCueDisplay = $derived(() => {
-    const { nextCueName, nextCueNumber } = progressData;
-    if (!nextCueName && !nextCueNumber) return '-';
-    return nextCueNumber ? `${nextCueNumber} - ${nextCueName}` : nextCueName;
-  });
+  let nextCueDisplay = $derived(formatCueDisplay(progressData.nextCueNumber, progressData.nextCueName));
 
   let pollTimer = null;
 
@@ -142,7 +139,7 @@
   <div class="progress-go-panel">
     <div class="progress-next-cue">
       <span class="progress-next-label">Next</span>
-      <span class="progress-next-value">{nextCueDisplay()}</span>
+      <span class="progress-next-value">{nextCueDisplay}</span>
     </div>
     <button class="btn btn-primary btn-go" disabled={going} onclick={go}>
       {going ? 'Sending…' : 'GO'}

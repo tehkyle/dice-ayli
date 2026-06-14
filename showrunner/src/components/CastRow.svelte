@@ -2,18 +2,13 @@
   import { castData } from '../stores/cast.svelte.js';
   import { actorImageUrl } from '../lib/format.js';
 
-  let { track, actors, takenActors } = $props();
+  let { track, actors, takenActors, isDupe } = $props();
 
   let selected = $derived(castData.selections[track.id] ?? '');
-  let actor = $derived(actors.find(a => a.name === selected) ?? null);
-  let imgUrl = $derived(actor ? actorImageUrl(actor.image) : null);
+  let actor    = $derived(actors.find(a => a.name === selected) ?? null);
+  let imgUrl   = $derived(actor ? actorImageUrl(actor.image) : null);
 
-  let isDupe = $derived(
-    selected !== '' &&
-    Object.entries(castData.selections).some(([k, v]) => k !== track.id && v === selected)
-  );
-
-  function onChange(e) {
+  function handleChange(e) {
     castData.selections[track.id] = e.target.value;
   }
 </script>
@@ -32,7 +27,7 @@
     <div class="row-actor-img" style="visibility:hidden"></div>
   {/if}
 
-  <select class="row-select" value={selected} onchange={onChange}>
+  <select class="row-select" value={selected} onchange={handleChange}>
     <option value="">— Select actor —</option>
     {#each actors as a (a.name)}
       <option

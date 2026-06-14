@@ -5,6 +5,13 @@ const http = require('http');
 
 const PORT = parseInt(process.env.PORT, 10) || 3000;
 
+// Startup polling — wait up to 10 seconds for the server to respond
+const SERVER_POLL_INTERVAL_MS = 250;
+const SERVER_POLL_ATTEMPTS    = 40;
+
+// Delay update check so it doesn't race with app startup
+const UPDATE_CHECK_DELAY_MS = 5000;
+
 let serverProcess;
 let mainWindow;
 const serverLogs = [];
@@ -48,14 +55,14 @@ function startServer() {
   });
 }
 
-function waitForServer(onReady, attemptsLeft = 40) {
+function waitForServer(onReady, attemptsLeft = SERVER_POLL_ATTEMPTS) {
   const req = http.get(`http://localhost:${PORT}`, () => {
     pollTimer = null;
     onReady();
   });
   req.on('error', () => {
     if (attemptsLeft > 0) {
-      pollTimer = setTimeout(() => waitForServer(onReady, attemptsLeft - 1), 250);
+      pollTimer = setTimeout(() => waitForServer(onReady, attemptsLeft - 1), SERVER_POLL_INTERVAL_MS);
     } else {
       pollTimer = null;
       showFatalError(`Server did not respond on port ${PORT} after 10 seconds`);
@@ -103,10 +110,9 @@ function setupUpdater() {
     log(`[Updater] ${err.message}`);
   });
 
-  // Check after a short delay so startup isn't blocked
   setTimeout(() => {
     autoUpdater.checkForUpdates().catch(err => log(`[Updater] Check failed: ${err.message}`));
-  }, 5000);
+  }, UPDATE_CHECK_DELAY_MS);
 }
 
 app.whenReady().then(() => {

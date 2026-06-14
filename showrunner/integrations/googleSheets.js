@@ -64,19 +64,17 @@ async function appendShowToSheet(show, performanceNumber, castAssignments, scene
   castAssignments.forEach(a => { castMap[a.character_track] = a.actor_name; });
   const castColumns = (config.characterTracks || []).map(t => castMap[t.id] || '');
 
-  // Two flavours of duration cell:
-  //   durationCell     → Sheets time serial for correct column formatting + AVERAGE
-  //   durationCellTsv  → human-readable m:ss string for clipboard fallback
-  function durationCell(entry) {
+  // Duration as a Sheets time serial (for column formatting + AVERAGE formulas)
+  // or as a human-readable m:ss string for the clipboard TSV fallback.
+  function durationCell(entry, { tsv = false } = {}) {
     if (!entry || entry.duration_ms == null) return '';
+    if (tsv) {
+      const totalSec = Math.round(entry.duration_ms / 1000);
+      const m = Math.floor(totalSec / 60);
+      const s = totalSec % 60;
+      return `${m}:${String(s).padStart(2, '0')}`;
+    }
     return entry.duration_ms / 86400000;
-  }
-  function durationCellTsv(entry) {
-    if (!entry || entry.duration_ms == null) return '';
-    const totalSec = Math.round(entry.duration_ms / 1000);
-    const m = Math.floor(totalSec / 60);
-    const s = totalSec % 60;
-    return `${m}:${String(s).padStart(2, '0')}`;
   }
 
   // Per act: one order column + one duration column per possible scene
@@ -90,13 +88,13 @@ async function appendShowToSheet(show, performanceNumber, castAssignments, scene
     for (const sceneName of act.scenes) {
       const entry = actScenes.find(e => e.scene_name === sceneName);
       actSceneColumns.push(durationCell(entry));
-      actSceneColumnsTsv.push(durationCellTsv(entry));
+      actSceneColumnsTsv.push(durationCell(entry, { tsv: true }));
     }
   }
 
   // Static scenes (Entr'acte, Finale, etc.) — one duration column each
   const staticSceneColumns    = (config.staticScenes || []).map(n => durationCell(scenesPlayed.find(e => e.scene_name === n)));
-  const staticSceneColumnsTsv = (config.staticScenes || []).map(n => durationCellTsv(scenesPlayed.find(e => e.scene_name === n)));
+  const staticSceneColumnsTsv = (config.staticScenes || []).map(n => durationCell(scenesPlayed.find(e => e.scene_name === n), { tsv: true }));
 
   const startTime = show.locked_at
     ? new Date(show.locked_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })

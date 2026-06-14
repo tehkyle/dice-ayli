@@ -1,92 +1,116 @@
-const fs = require('fs');
+const fs   = require('fs');
 const path = require('path');
 const EventEmitter = require('events');
 const { Client, Server } = require('node-osc');
+const { extractWorkspaceId } = require('../utils');
 
+// ── Network config (override via .env) ────────────────────────────────────────
 const QLAB_HOST         = process.env.QLAB_HOST || '127.0.0.1';
-const QLAB_SEND_PORT    = parseInt(process.env.QLAB_SEND_PORT, 10) || 53000;
+const QLAB_SEND_PORT    = parseInt(process.env.QLAB_SEND_PORT,  10) || 53000;
 const QLAB_RECEIVE_PORT = parseInt(process.env.QLAB_RECEIVE_PORT, 10) || 53001;
 
-// All QLab replies arrive on our receive port (53001) and are forwarded here.
+// ── Timing constants ───────────────────────────────────────────────────────────
+const WORKSPACE_DISCOVER_MS = 2000;
+const CONNECT_TIMEOUT_MS    = 2000;
+const HEALTH_CHECK_MS       = 3000;
+const PLAYHEAD_QUERY_MS     = 500;
+
+// ── QLab OSC address builders ──────────────────────────────────────────────────
+// These are the complete set of OSC paths this module writes to or reads from.
+const OSC = {
+  workspaces: ()                   => '/workspaces',
+  connect:    (ws)                 => `/workspace/${ws}/connect`,
+  updates:    (ws)                 => `/workspace/${ws}/updates`,
+  cue:        (ws, id, cmd)        => ws ? `/workspace/${ws}/cue/${id}/${cmd}` : `/cue/${id}/${cmd}`,
+  cueById:    (ws, id, prop)       => `/workspace/${ws}/cue_id/${id}/${prop}`,
+  panic:      (ws)                 => ws ? `/workspace/${ws}/panic` : '/panic',
+  playhead:   (ws, cue)            => `/workspace/${ws}/playhead/${cue}`,
+};
+
+// ── Internal state ─────────────────────────────────────────────────────────────
 const replyBus = new EventEmitter();
 replyBus.setMaxListeners(20);
 
-// Single persistent UDP client — never closed, matches test-qlab.js behaviour.
-// Creating+closing a new Client per send races with the async UDP write and drops packets.
+// Single persistent UDP client — never closed between sends.
+// Creating+closing per-send races the async UDP write and drops packets.
 const oscClient = new Client(QLAB_HOST, QLAB_SEND_PORT);
 
-// Session state — reset if QLab restarts
 let workspaceId        = null;
 let connected          = false;
-let activeShowId       = null; // set when a show is locked, cleared on /show/end
-let lastKnownCueNumber = null; // updated on every playhead poll
+let activeShowId       = null;
+let lastKnownCueNumber = null;
+let currentPlayhead    = { cueNumber: '', cueName: '' };
 
-// Set by startReceiver so endShow() can be called from HTTP routes too
 let _db = null;
 let _io = null;
 
-function timestamp() {
-  return new Date().toISOString();
-}
+// ── Logging ────────────────────────────────────────────────────────────────────
+const ts     = () => new Date().toISOString();
+const log    = (msg) => console.log(`[OSC]     ${ts()} ${msg}`);
+const logOut = (msg) => console.log(`[OSC OUT] ${ts()} ${msg}`);
+const logIn  = (msg) => console.log(`[OSC IN]  ${ts()} ${msg}`);
+const logErr = (msg) => console.error(`[OSC ERR] ${ts()} ${msg}`);
 
+// ── Helpers ────────────────────────────────────────────────────────────────────
 function loadConfig() {
   return JSON.parse(fs.readFileSync(path.join(__dirname, '../config.json'), 'utf8'));
 }
 
-function extractWorkspaceId(body) {
-  if (body?.workspace_id) return body.workspace_id;
-  if (Array.isArray(body?.data) && body.data[0]?.workspace_id) return body.data[0].workspace_id;
-  return null;
-}
-
-// Resolve the workspace qualifier to use in OSC addresses.
-// Priority: configured UUID → configured name → discovered UUID → null (broadcast)
+// Resolve the OSC workspace qualifier (UUID → name → discovered UUID → null for broadcast).
 function workspaceQualifier() {
-  const { qlabWorkspaceName, qlabWorkspaceId } = loadConfig();
-  if (qlabWorkspaceId)   return qlabWorkspaceId;
-  if (qlabWorkspaceName) return qlabWorkspaceName;
-  if (workspaceId)       return workspaceId;
-  return null;
+  const { qlabWorkspaceId, qlabWorkspaceName } = loadConfig();
+  return qlabWorkspaceId || qlabWorkspaceName || workspaceId || null;
 }
 
 function cueAddress(trackId, command) {
-  const ws = workspaceQualifier();
-  if (ws) return `/workspace/${ws}/cue/${trackId}/${command}`;
-  return `/cue/${trackId}/${command}`; // broadcast — hits all open workspaces
+  return OSC.cue(workspaceQualifier(), trackId, command);
 }
 
-// --- Connection management ---
-
-function discoverWorkspace() {
+// Waits for the next replyBus emission that satisfies matchFn(address, body).
+// matchFn returns `undefined` to keep waiting, or any other value (including null/false) to resolve.
+function waitForOscReply(matchFn, timeoutMs) {
   return new Promise((resolve) => {
-    if (workspaceId) return resolve(workspaceId);
+    let settled = false;
 
-    let done = false;
-    function onReply(_address, args) {
-      if (done) return;
-      try {
-        const body = JSON.parse(args[0]);
-        const found = extractWorkspaceId(body);
-        if (found) {
-          done = true;
-          replyBus.off('reply', onReply);
-          workspaceId = found;
-          console.log(`[OSC] Workspace ID: ${workspaceId}`);
-          resolve(workspaceId);
-        }
-      } catch (_) {}
+    function onReply(address, args) {
+      if (settled) return;
+      let body;
+      try { body = JSON.parse(args[0]); } catch { return; }
+      const result = matchFn(address, body);
+      if (result === undefined) return;
+      settled = true;
+      replyBus.off('reply', onReply);
+      resolve(result);
     }
 
     replyBus.on('reply', onReply);
-    oscClient.send('/workspaces');
-
     setTimeout(() => {
-      if (!done) {
+      if (!settled) {
+        settled = true;
         replyBus.off('reply', onReply);
-        resolve(null);
+        resolve(undefined);
       }
-    }, 2000);
+    }, timeoutMs);
   });
+}
+
+// ── Connection management ──────────────────────────────────────────────────────
+
+async function discoverWorkspace() {
+  if (workspaceId) return workspaceId;
+
+  const found = waitForOscReply(
+    (_addr, body) => extractWorkspaceId(body) || undefined,
+    WORKSPACE_DISCOVER_MS
+  );
+  oscClient.send(OSC.workspaces());
+  const id = await found;
+
+  if (id) {
+    workspaceId = id;
+    log(`Workspace: ${workspaceId}`);
+  }
+  return id ?? null;
 }
 
 async function connectQLab() {
@@ -96,44 +120,33 @@ async function connectQLab() {
   const ws = workspaceQualifier() || await discoverWorkspace();
   if (!ws) return 'no_workspace';
 
-  return new Promise((resolve) => {
-    let done = false;
+  const addr = OSC.connect(ws);
+  const statusPromise = waitForOscReply(
+    (address, body) => address.includes('/connect') ? (body?.status ?? 'unknown') : undefined,
+    CONNECT_TIMEOUT_MS
+  );
 
-    function onReply(address, args) {
-      if (done || !address.includes('/connect')) return;
-      done = true;
-      replyBus.off('reply', onReply);
-      try {
-        const body = JSON.parse(args[0]);
-        const status = body?.status || 'unknown';
-        if (status === 'ok') {
-          connected = true;
-          console.log(`[OSC] Connected to QLab workspace`);
-        } else {
-          console.error(`[OSC] QLab connect failed: ${status}`);
-        }
-        resolve(status);
-      } catch { resolve('unknown'); }
-    }
+  logOut(addr + (qlabPasscode ? ' (with passcode)' : ''));
+  if (qlabPasscode) oscClient.send(addr, qlabPasscode);
+  else oscClient.send(addr);
 
-    replyBus.on('reply', onReply);
+  const status = (await statusPromise) ?? 'timeout';
 
-    const addr = `/workspace/${ws}/connect`;
-    if (qlabPasscode) {
-      console.log(`[OSC OUT] ${timestamp()} ${addr} (with passcode)`);
-      oscClient.send(addr, qlabPasscode);
-    } else {
-      console.log(`[OSC OUT] ${timestamp()} ${addr}`);
-      oscClient.send(addr);
-    }
+  if (status === 'ok') {
+    connected = true;
+    log('Connected to QLab workspace');
+    subscribeToUpdates(ws);
+  } else {
+    logErr(`Connect failed: ${status}`);
+  }
 
-    setTimeout(() => {
-      if (!done) {
-        replyBus.off('reply', onReply);
-        resolve('timeout');
-      }
-    }, 2000);
-  });
+  return status;
+}
+
+function subscribeToUpdates(ws) {
+  const addr = OSC.updates(ws);
+  logOut(addr);
+  oscClient.send(addr, 1);
 }
 
 async function ensureConnected() {
@@ -141,23 +154,51 @@ async function ensureConnected() {
   if (!connected) await connectQLab();
 }
 
-function setLastKnownPlayhead(cueNumber) {
-  if (cueNumber && cueNumber !== '-') lastKnownCueNumber = cueNumber;
+// ── Playhead tracking ──────────────────────────────────────────────────────────
+
+// Called when QLab sends a playbackPosition update with a cue_id.
+// Queries the cue's number + name and caches the result.
+async function updatePlayhead(cueId) {
+  const ws = workspaceQualifier();
+  if (!ws || !cueId) return;
+
+  const numPromise  = waitForOscReply(
+    (addr, body) => addr.includes(`/cue_id/${cueId}/number`) ? (body?.data ?? '') : undefined,
+    PLAYHEAD_QUERY_MS
+  );
+  const namePromise = waitForOscReply(
+    (addr, body) => addr.includes(`/cue_id/${cueId}/name`) ? (body?.data ?? '') : undefined,
+    PLAYHEAD_QUERY_MS
+  );
+
+  oscClient.send(OSC.cueById(ws, cueId, 'number'));
+  oscClient.send(OSC.cueById(ws, cueId, 'name'));
+
+  const [rawNumber, rawName] = await Promise.all([numPromise, namePromise]);
+  const cueNumber = (rawNumber == null || rawNumber === '-') ? '' : rawNumber;
+  const cueName   = rawName ?? '';
+
+  currentPlayhead = { cueNumber, cueName };
+  if (cueNumber) lastKnownCueNumber = cueNumber;
+}
+
+function getPlayhead() {
+  return currentPlayhead;
 }
 
 function restorePlayhead(cueNumber) {
   if (!cueNumber) return;
   const ws = workspaceQualifier();
   if (!ws) return;
-  const addr = `/workspace/${ws}/playhead/${cueNumber}`;
-  console.log(`[OSC OUT] ${timestamp()} ${addr}`);
+  const addr = OSC.playhead(ws, cueNumber);
+  logOut(addr);
   try { oscClient.send(addr); } catch (err) {
-    console.error(`[OSC ERR] restorePlayhead: ${err.message}`);
+    logErr(`restorePlayhead: ${err.message}`);
   }
 }
 
 async function reconnectQLab(cueNumber) {
-  connected = false;
+  connected   = false;
   workspaceId = null;
   await discoverWorkspace();
   const status = await connectQLab();
@@ -168,65 +209,52 @@ async function reconnectQLab(cueNumber) {
   return status;
 }
 
-// --- Public API ---
+// ── Public send API ────────────────────────────────────────────────────────────
 
-/**
- * Send cast assignments to QLab by writing actor names into memo cue notes,
- * then fire the CAST_CONFIRMED cue.
- * @param {Object} castMap - { trackId: "Actor Name", ... }
- * @returns {Promise<boolean>} true if all sends completed without error
- */
 async function sendCastToQLab(castMap) {
   await ensureConnected();
-
+  const { castConfirmedCue } = loadConfig();
   let allOk = true;
 
   for (const [track, actor] of Object.entries(castMap)) {
-    const address = cueAddress(track, 'notes');
-    console.log(`[OSC OUT] ${timestamp()} ${address} "${actor}"`);
+    const addr = cueAddress(track, 'notes');
+    logOut(`${addr} "${actor}"`);
     try {
-      oscClient.send(address, actor);
+      oscClient.send(addr, actor);
     } catch (err) {
-      console.error(`[OSC ERR] ${timestamp()} Failed to send ${address}: ${err.message}`);
+      logErr(`Failed to send ${addr}: ${err.message}`);
       allOk = false;
     }
   }
 
-  const confirmAddress = cueAddress('CAST_CONFIRMED', 'start');
-  console.log(`[OSC OUT] ${timestamp()} ${confirmAddress}`);
+  const confirmAddr = cueAddress(castConfirmedCue, 'start');
+  logOut(confirmAddr);
   try {
-    oscClient.send(confirmAddress);
+    oscClient.send(confirmAddr);
   } catch (err) {
-    console.error(`[OSC ERR] ${timestamp()} Failed to send ${confirmAddress}: ${err.message}`);
+    logErr(`Failed to send ${confirmAddr}: ${err.message}`);
     allOk = false;
   }
 
   return allOk;
 }
 
-/**
- * Send act scene selections to QLab by writing comma-separated scene IDs
- * into the notes of the corresponding memo cues (A2_SCENES, A3_SCENES, A4_SCENES).
- * When orderedMap[actCueId] is true, the value is prefixed with "ORDERED:" so the
- * AppleScript randomiser pops from the front instead of randomising.
- * @param {Object} scenesMap   - { actCueId: ["sceneId", ...], ... }
- * @param {Object} orderedMap  - { actCueId: true, ... } (optional)
- * @returns {Promise<boolean>}
- */
+// Sends act scene selections to QLab by writing comma-separated scene IDs into
+// the notes of the act memo cues. Prefix "ORDERED:" signals the QLab randomiser
+// to pop from the front instead of shuffling.
 async function sendScenesToQLab(scenesMap, orderedMap = {}) {
   await ensureConnected();
-
   let allOk = true;
 
   for (const [actCueId, scenes] of Object.entries(scenesMap)) {
-    const address = cueAddress(actCueId, 'notes');
-    const csv = Array.isArray(scenes) ? scenes.join(',') : String(scenes);
+    const addr  = cueAddress(actCueId, 'notes');
+    const csv   = Array.isArray(scenes) ? scenes.join(',') : String(scenes);
     const value = orderedMap[actCueId] ? `ORDERED:${csv}` : csv;
-    console.log(`[OSC OUT] ${timestamp()} ${address} "${value}"`);
+    logOut(`${addr} "${value}"`);
     try {
-      oscClient.send(address, value);
+      oscClient.send(addr, value);
     } catch (err) {
-      console.error(`[OSC ERR] ${timestamp()} Failed to send ${address}: ${err.message}`);
+      logErr(`Failed to send ${addr}: ${err.message}`);
       allOk = false;
     }
   }
@@ -234,18 +262,30 @@ async function sendScenesToQLab(scenesMap, orderedMap = {}) {
   return allOk;
 }
 
-/**
- * Ping QLab and confirm each track has a corresponding memo cue.
- * @param {string[]} trackIds
- * @returns {Promise<{ reachable: boolean, missingVars: string[] }>}
- */
-async function checkQLab(trackIds) {
-  const TIMEOUT = 3000;
+async function sendGo() {
+  await ensureConnected();
+  const { qlabMainCueList } = loadConfig();
+  const ws   = workspaceQualifier();
+  const addr = OSC.cue(ws, qlabMainCueList, 'go');
+  logOut(addr);
+  oscClient.send(addr);
+}
 
+async function sendPanicAll() {
+  await ensureConnected();
+  const addr = OSC.panic(workspaceQualifier());
+  logOut(addr);
+  try { oscClient.send(addr); } catch (err) {
+    logErr(`sendPanicAll: ${err.message}`);
+  }
+}
+
+// Pings QLab and confirms each character track has a corresponding memo cue.
+async function checkQLab(trackIds) {
   await ensureConnected();
 
   return new Promise((resolve) => {
-    let reachable = false; // only true when QLab actually replies — not just "we think we're connected"
+    let reachable = false;
     let finished  = false;
     const found   = new Set();
 
@@ -253,7 +293,8 @@ async function checkQLab(trackIds) {
       if (finished) return;
       finished = true;
       replyBus.off('reply', onReply);
-      if (!reachable) connected = false; // stale/failed session — force fresh reconnect next time
+      // Stale/failed session — force fresh reconnect on next send
+      if (!reachable) connected = false;
       resolve({
         reachable,
         missingVars: reachable ? trackIds.filter(id => !found.has(id)) : [...trackIds],
@@ -265,58 +306,46 @@ async function checkQLab(trackIds) {
         reachable = true;
         return;
       }
-      try {
-        const body = JSON.parse(args[0]);
-        if (body?.status === 'denied') {
-          // Session not authenticated — reset so ensureConnected() re-sends the passcode next time
-          connected = false;
-        } else {
-          reachable = true;
-          if (body?.status === 'ok') {
-            for (const id of trackIds) {
-              if (address.includes(`/cue/${id}/`)) found.add(id);
-            }
+      let body;
+      try { body = JSON.parse(args[0]); } catch (err) {
+        logErr(`checkQLab reply parse: ${err.message}`);
+        return;
+      }
+      if (body?.status === 'denied') {
+        // Session not authenticated — re-send passcode on next command
+        connected = false;
+      } else {
+        reachable = true;
+        if (body?.status === 'ok') {
+          for (const id of trackIds) {
+            if (address.includes(`/cue/${id}/`)) found.add(id);
           }
         }
-      } catch (_) {}
+      }
     }
 
     replyBus.on('reply', onReply);
 
     try {
-      for (const id of trackIds) {
-        oscClient.send(cueAddress(id, 'type'));
-      }
+      for (const id of trackIds) oscClient.send(cueAddress(id, 'type'));
     } catch (err) {
-      console.error(`[OSC ERR] checkQLab send failed: ${err.message}`);
+      logErr(`checkQLab send failed: ${err.message}`);
     }
 
-    setTimeout(finish, TIMEOUT);
+    setTimeout(finish, HEALTH_CHECK_MS);
   });
 }
 
-/**
- * Set the active show ID so that incoming scene_picked events are associated
- * with the correct show. Called by routes/shows.js after a show is locked.
- * @param {number|null} id
- */
 function setActiveShow(id) {
   activeShowId = id;
-  console.log(`[OSC] Active show set to ${id}`);
+  log(`Active show set to ${id}`);
 }
 
-/**
- * End the active show: mark ended_at, compute scene durations, write to Sheets,
- * and emit show_ended over the websocket. Safe to call from both the OSC handler
- * and HTTP routes.
- * @param {number|null} showId
- */
 function endShow(showId) {
   if (showId == null || !_db) return;
   activeShowId = null;
 
-  const timeStr = timestamp();
-  if (_io) _io.emit('show_ended', { showId, time: timeStr });
+  if (_io) _io.emit('show_ended', { showId, time: new Date().toISOString() });
 
   try {
     const { appendShowToSheet } = require('../integrations/googleSheets');
@@ -325,11 +354,10 @@ function endShow(showId) {
     show.ended_at = new Date().toISOString();
     _db.write();
 
-    const performanceNumber = [..._db.data.shows]
-      .sort((a, b) => a.id - b.id)
-      .findIndex(s => s.id === showId) + 1;
-    const castAssignments = _db.data.cast_assignments.filter(a => a.show_id === showId);
-    const scenesPlayed = _db.data.scene_log
+    const allSorted        = [..._db.data.shows].sort((a, b) => a.id - b.id);
+    const performanceNumber = allSorted.findIndex(s => s.id === showId) + 1;
+    const castAssignments   = _db.data.cast_assignments.filter(a => a.show_id === showId);
+    const scenesPlayed      = _db.data.scene_log
       .filter(e => e.show_id === showId)
       .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
@@ -344,16 +372,14 @@ function endShow(showId) {
       .then(result => {
         if (result && !result.success && _io) _io.emit('sheets_error');
       })
-      .catch(err => console.error(`[Sheets ERR] ${timestamp()} ${err.message}`));
+      .catch(err => logErr(err.message));
   } catch (err) {
-    console.error(`[Sheets ERR] ${timestamp()} ${err.message}`);
+    logErr(err.message);
   }
 }
 
-/**
- * Start the OSC UDP receiver. Routes /reply/... to replyBus,
- * auto-discovers workspace ID, and handles incoming scene events.
- */
+// ── OSC receiver ───────────────────────────────────────────────────────────────
+
 function startReceiver(db, io) {
   _db = db;
   _io = io;
@@ -361,33 +387,40 @@ function startReceiver(db, io) {
 
   server.on('message', (msg) => {
     const [address, ...args] = msg;
-    console.log(`[OSC IN]  ${timestamp()} ${address} ${args.join(' ')}`);
+    logIn(`${address} ${args.join(' ')}`);
 
     if (address.startsWith('/reply/')) {
+      // Opportunistically grab workspace ID from any reply before we've discovered it
       if (!workspaceId) {
         try {
           const body = JSON.parse(args[0]);
           const found = extractWorkspaceId(body);
           if (found) {
             workspaceId = found;
-            console.log(`[OSC] Workspace ID: ${workspaceId}`);
+            log(`Workspace: ${workspaceId}`);
           }
-        } catch (_) {}
+        } catch { /* not a JSON reply — ignore */ }
       }
-      // Reset session state on error/denied so the next command re-connects
+
       try {
         const body = JSON.parse(args[0]);
         if (body?.status === 'denied') {
-          connected = false;
+          connected   = false;
           workspaceId = null;
-          console.log(`[OSC] Session denied by QLab — will reconnect on next send`);
+          log('Session denied by QLab — will reconnect on next send');
           reconnectQLab().catch(() => {});
         } else if (body?.status === 'error' && address.includes('/cue/')) {
           connected = false;
         }
-      } catch (_) {}
+      } catch { /* not a JSON reply — ignore */ }
 
       replyBus.emit('reply', address, args);
+      return;
+    }
+
+    if (address.includes('/playbackPosition')) {
+      const cueId = args[0];
+      if (cueId) updatePlayhead(cueId);
       return;
     }
 
@@ -397,51 +430,41 @@ function startReceiver(db, io) {
       try {
         const { nextId } = require('../db/database');
         db.data.scene_log.push({
-          id: nextId(db.data.scene_log),
-          show_id: activeShowId,
+          id:         nextId(db.data.scene_log),
+          show_id:    activeShowId,
           scene_name: sceneName,
-          position: null,
-          timestamp: new Date().toISOString(),
+          position:   null,
+          timestamp:  new Date().toISOString(),
         });
         db.write();
       } catch (err) {
-        console.error(`[OSC ERR] ${timestamp()} scene_log insert failed: ${err.message}`);
+        logErr(`scene_log insert failed: ${err.message}`);
       }
-      if (io) io.emit('scene_started', { scene: sceneName, time: timestamp() });
+      if (io) io.emit('scene_started', { scene: sceneName, time: ts() });
       return;
     }
 
     if (address === '/show/end') {
-      const showId = activeShowId;
-      console.log(`[OSC] Show end received for show ${showId}`);
-      endShow(showId);
+      log(`Show end received for show ${activeShowId}`);
+      endShow(activeShowId);
     }
   });
 
-  server.on('error', (err) => {
-    console.error(`[OSC ERR] ${timestamp()} Receiver error: ${err.message}`);
-  });
+  server.on('error', (err) => logErr(`Receiver: ${err.message}`));
 
-  console.log(`[OSC] Receiver listening on UDP port ${QLAB_RECEIVE_PORT}`);
+  log(`Receiver listening on UDP port ${QLAB_RECEIVE_PORT}`);
   return server;
 }
 
-async function sendGo() {
-  await ensureConnected();
-  const ws = workspaceQualifier();
-  const addr = ws ? `/workspace/${ws}/cue/MAIN/go` : '/cue/MAIN/go';
-  console.log(`[OSC OUT] ${timestamp()} ${addr}`);
-  oscClient.send(addr);
-}
-
-async function sendPanicAll() {
-  await ensureConnected();
-  const ws = workspaceQualifier();
-  const addr = ws ? `/workspace/${ws}/panic` : '/panic';
-  console.log(`[OSC OUT] ${timestamp()} ${addr}`);
-  try { oscClient.send(addr); } catch (err) {
-    console.error(`[OSC ERR] sendPanicAll: ${err.message}`);
-  }
-}
-
-module.exports = { sendCastToQLab, sendScenesToQLab, startReceiver, checkQLab, setActiveShow, sendGo, sendPanicAll, reconnectQLab, setLastKnownPlayhead, endShow };
+module.exports = {
+  startReceiver,
+  checkQLab,
+  setActiveShow,
+  endShow,
+  getPlayhead,
+  sendCastToQLab,
+  sendScenesToQLab,
+  sendGo,
+  sendPanicAll,
+  reconnectQLab,
+};

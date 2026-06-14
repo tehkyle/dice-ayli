@@ -13,7 +13,6 @@
   let saveError = $state('');
 
   function startEdit() {
-    const castByTrack = Object.fromEntries((show.cast || []).map(a => [a.character_track, a.actor_name]));
     editCast = Object.fromEntries(tracks.map(t => [t.id, castByTrack[t.id] || '']));
     editMode = true;
     deleteConfirm = false;
@@ -52,11 +51,11 @@
     }
   }
 
-  const castByTrack = $derived(Object.fromEntries((show.cast || []).map(a => [a.character_track, a.actor_name])));
-  const headerTime = $derived(() => {
+  const castByTrack = $derived(Object.fromEntries((show.cast ?? []).map(a => [a.character_track, a.actor_name])));
+  const headerTime = $derived.by(() => {
     if (!show.locked_at) return 'Not locked';
     const start = formatTime(show.locked_at);
-    const run = show.ended_at ? formatRunTime(show.locked_at, show.ended_at) : null;
+    const run   = show.ended_at ? formatRunTime(show.locked_at, show.ended_at) : null;
     return run ? `${start}  ·  ${run}` : start;
   });
 </script>
@@ -64,7 +63,7 @@
 <div class="history-card">
   <div class="history-card-header">
     <div class="history-card-perf">Performance #{show.performance_number}</div>
-    <div class="history-card-time">{headerTime()}</div>
+    <div class="history-card-time">{headerTime}</div>
   </div>
 
   <div class="history-cast-list">
@@ -98,10 +97,10 @@
     {/each}
   </div>
 
-  {#if (show.scenes_played || []).length > 0 && acts.length > 0}
+  {#if show.scenes_played?.length > 0 && acts.length > 0}
     <div class="history-scenes-section">
       {#each acts as act}
-        {@const actScenes = (show.scenes_played || []).filter(e => act.scenes.includes(e.scene_name))}
+        {@const actScenes = show.scenes_played.filter(e => act.scenes.includes(e.scene_name))}
         {#if actScenes.length > 0}
           <div class="history-act-row">
             <span class="history-act-label">{act.label}</span>

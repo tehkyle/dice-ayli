@@ -8,16 +8,19 @@
     new Set(Object.values(castData.selections).filter(Boolean))
   );
 
-  let hasDupes = $derived(() => {
-    const vals = Object.values(castData.selections).filter(Boolean);
-    return vals.length !== new Set(vals).size;
+  // Track which actor names appear in more than one slot so each CastRow
+  // can highlight itself without re-scanning siblings.
+  let dupeActors = $derived.by(() => {
+    const counts = {};
+    for (const v of Object.values(castData.selections)) {
+      if (v) counts[v] = (counts[v] || 0) + 1;
+    }
+    return new Set(Object.keys(counts).filter(k => counts[k] > 1));
   });
 
-  let allDone = $derived(
-    configData.characterTracks.every(t => castData.selections[t.id])
-  );
-
-  let reviewDisabled = $derived(hasDupes() || !allDone);
+  let hasDupes  = $derived(dupeActors.size > 0);
+  let allDone   = $derived(configData.characterTracks.every(t => castData.selections[t.id]));
+  let reviewDisabled = $derived(hasDupes || !allDone);
 </script>
 
 <div class="screen-inner">
@@ -26,11 +29,16 @@
 
   <div class="cast-rows">
     {#each configData.characterTracks as track (track.id)}
-      <CastRow {track} actors={configData.actors} {takenActors} />
+      <CastRow
+        {track}
+        actors={configData.actors}
+        {takenActors}
+        isDupe={dupeActors.has(castData.selections[track.id] || '')}
+      />
     {/each}
   </div>
 
-  {#if hasDupes()}
+  {#if hasDupes}
     <div class="warning">An actor is assigned to more than one track. Resolve before continuing.</div>
   {/if}
 

@@ -7,12 +7,12 @@
   import { progressData, resetProgress } from '../stores/progress.svelte.js';
   import { api } from '../lib/api.js';
   import { getSocket } from '../lib/socket.js';
-  import { formatDate, formatDuration, formatDurationReport } from '../lib/format.js';
+  import { formatDate, formatDuration, formatDurationReport, toIsoDate } from '../lib/format.js';
   import CastSummaryRow from '../components/CastSummaryRow.svelte';
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = toIsoDate();
 
-  let showLength = $derived(() => {
+  let showLength = $derived.by(() => {
     const last = progressData.scenesPlayed[progressData.scenesPlayed.length - 1];
     if (!showData.lockTime || !last?.duration) return '—';
     const endMs = new Date(last.time).getTime() + (last.duration ?? 0);
@@ -23,22 +23,12 @@
   let sheetsError   = $state(false);
   let copied        = $state(false);
 
-  // Build a tab-separated row from current store state — same column order as the sheet.
-  // Used for the always-available clipboard button and as the fallback if Sheets write fails.
-  let tsvRow = $derived(() => {
-    const sceneMap = Object.fromEntries(
-      progressData.scenesPlayed.map(e => [e.scene, e])
-    );
+  // Builds a tab-separated row matching the Google Sheets column order.
+  // Used for the clipboard button and as fallback when the Sheets write fails.
+  let tsvRow = $derived.by(() => {
+    const sceneMap = Object.fromEntries(progressData.scenesPlayed.map(e => [e.scene, e]));
 
-    function durStr(entry) {
-      if (!entry?.duration) return '';
-      const totalSec = Math.round(entry.duration / 1000);
-      const m = Math.floor(totalSec / 60);
-      const s = totalSec % 60;
-      return `${m}:${String(s).padStart(2, '0')}`;
-    }
-
-    const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    const date  = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
     const start = showData.lockTime
       ? new Date(showData.lockTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
       : '';
@@ -46,7 +36,7 @@
     const last = progressData.scenesPlayed[progressData.scenesPlayed.length - 1];
     let run = '';
     if (showData.lockTime && last) {
-      const endMs   = new Date(last.time).getTime() + (last.duration ?? 0);
+      const endMs    = new Date(last.time).getTime() + (last.duration ?? 0);
       const totalSec = Math.round((endMs - new Date(showData.lockTime).getTime()) / 1000);
       const h = Math.floor(totalSec / 3600);
       const m = Math.floor((totalSec % 3600) / 60);
@@ -54,18 +44,20 @@
       run = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
     }
 
-    const castCols = configData.characterTracks.map(t => castData.selections[t.id] || '');
-
+    const castCols  = configData.characterTracks.map(t => castData.selections[t.id] || '');
     const sceneCols = [];
     for (const act of configData.acts) {
       const actEntries = progressData.scenesPlayed.filter(e => act.scenes.includes(e.scene));
       sceneCols.push(actEntries.map(e => e.scene).join(' → '));
       for (const sceneName of act.scenes) {
-        sceneCols.push(durStr(sceneMap[sceneName]));
+        const entry = sceneMap[sceneName];
+        sceneCols.push(entry?.duration ? formatDurationReport(entry.duration) : '');
       }
     }
-
-    const staticCols = configData.staticScenes.map(name => durStr(sceneMap[name]));
+    const staticCols = configData.staticScenes.map(name => {
+      const entry = sceneMap[name];
+      return entry?.duration ? formatDurationReport(entry.duration) : '';
+    });
 
     return [date, start, run, ...castCols, ...sceneCols, ...staticCols].join('\t');
   });
@@ -88,7 +80,7 @@
 
   async function copyToClipboard() {
     try {
-      await navigator.clipboard.writeText(tsvRow());
+      await navigator.clipboard.writeText(tsvRow);
       copied = true;
       setTimeout(() => { copied = false; }, 2000);
     } catch {}
@@ -115,7 +107,7 @@
     </div>
     <div class="summary-stat">
       <span class="summary-stat-label">Show Length</span>
-      <span class="summary-stat-value">{showLength()}</span>
+      <span class="summary-stat-value">{showLength}</span>
     </div>
   </div>
 

@@ -2,29 +2,14 @@ const express = require('express');
 const router  = express.Router();
 const { google } = require('googleapis');
 
-const {
-  readSheetsConfig,
-  writeSheetsConfig,
-  saveTokens,
-  clearTokens,
-} = require('../integrations/sheetsConfig');
+const { readSheetsConfig, writeSheetsConfig, saveTokens, clearTokens } = require('../integrations/sheetsConfig');
+const { buildOAuthClient } = require('../utils');
 
 const SCOPES = [
   'https://www.googleapis.com/auth/spreadsheets',
   'https://www.googleapis.com/auth/drive.readonly',
   'https://www.googleapis.com/auth/userinfo.email',
 ];
-
-function buildOAuthClient(req) {
-  const proto       = req.headers['x-forwarded-proto'] || req.protocol;
-  const host        = req.headers['x-forwarded-host']  || req.headers.host;
-  const redirectUri = `${proto}://${host}/api/auth/google/callback`;
-  return new google.auth.OAuth2(
-    process.env.GOOGLE_OAUTH_CLIENT_ID,
-    process.env.GOOGLE_OAUTH_CLIENT_SECRET,
-    redirectUri
-  );
-}
 
 // GET /api/auth/google — start OAuth flow
 router.get('/google', (req, res) => {
@@ -33,8 +18,7 @@ router.get('/google', (req, res) => {
       'OAuth not configured — set GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET in .env'
     );
   }
-  const oauth2Client = buildOAuthClient(req);
-  const url = oauth2Client.generateAuthUrl({
+  const url = buildOAuthClient(req).generateAuthUrl({
     access_type: 'offline',
     prompt:      'consent',
     scope:       SCOPES,
@@ -44,20 +28,14 @@ router.get('/google', (req, res) => {
 
 // GET /api/auth/google/callback — exchange code, save tokens
 router.get('/google/callback', async (req, res) => {
-  if (req.query.error) {
-    return res.redirect('/?sheets_config=1&auth_error=1');
-  }
+  if (req.query.error) return res.redirect('/?sheets_config=1&auth_error=1');
   try {
-    const oauth2Client = buildOAuthClient(req);
-    const { tokens }   = await oauth2Client.getToken(req.query.code);
+    const oauth2Client    = buildOAuthClient(req);
+    const { tokens }      = await oauth2Client.getToken(req.query.code);
     oauth2Client.setCredentials(tokens);
-
-    const oauth2Info = google.oauth2({ version: 'v2', auth: oauth2Client });
-    const { data }   = await oauth2Info.userinfo.get();
-
+    const { data } = await google.oauth2({ version: 'v2', auth: oauth2Client }).userinfo.get();
     saveTokens(tokens);
     writeSheetsConfig({ userEmail: data.email || null });
-
     res.redirect('/?sheets_config=1');
   } catch (err) {
     console.error('[Auth] OAuth callback error:', err.message);

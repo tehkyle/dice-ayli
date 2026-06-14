@@ -4,34 +4,34 @@
   import { refreshBadge } from '../stores/sheets.svelte.js';
   import { api } from '../lib/api.js';
 
-  let modalState_connected = $state(false);
-  let modalState_disconnected = $state(false);
-  let authError = $state(false);
-  let email = $state('');
+  let connected    = $state(false);
+  let disconnected = $state(false);
+  let authError    = $state(false);
+  let email        = $state('');
 
-  let sheets = $state([]);
+  let sheets          = $state([]);
   let selectedSheetId = $state('');
   let selectedSheetName = $state('');
-  let sheetsLoading = $state(false);
-  let sheetsError = $state(false);
+  let sheetsLoading   = $state(false);
+  let sheetsError     = $state(false);
 
-  let tabs = $state([]);
+  let tabs        = $state([]);
   let selectedTab = $state('');
   let tabsLoading = $state(false);
   let tabsVisible = $state(false);
 
   let saveStatus = $state('');
-  let saveError = $state(false);
-  let saving = $state(false);
+  let saveError  = $state(false);
+  let saving     = $state(false);
 
   let saveDisabled = $derived(!selectedSheetId || !selectedTab || saving);
 
   async function load() {
-    modalState_connected = false;
-    modalState_disconnected = false;
-    authError = false;
-    saveStatus = '';
-    saveError = false;
+    connected    = false;
+    disconnected = false;
+    authError    = false;
+    saveStatus   = '';
+    saveError    = false;
 
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('auth_error') === '1') authError = true;
@@ -40,17 +40,17 @@
     try {
       status = await api.getAuthStatus();
     } catch {
-      modalState_disconnected = true;
+      disconnected = true;
       return;
     }
 
     if (!status.connected) {
-      modalState_disconnected = true;
+      disconnected = true;
       return;
     }
 
-    email = status.email ?? '';
-    modalState_connected = true;
+    email     = status.email ?? '';
+    connected = true;
 
     let currentCfg = {};
     try { currentCfg = await api.getSheetsConfig(); } catch {}
@@ -62,17 +62,16 @@
   }
 
   async function loadSheets(selectedId) {
-    sheets = [];
+    sheets      = [];
     sheetsError = false;
     sheetsLoading = true;
     tabsVisible = false;
-    tabs = [];
+    tabs        = [];
     selectedTab = '';
 
     try {
       const files = await api.listSheets();
-      if (files?.status === 401) { sheetsError = true; return; }
-      sheets = files ?? [];
+      sheets          = Array.isArray(files) ? files : [];
       selectedSheetId = selectedId ?? '';
       selectedSheetName = sheets.find(f => f.id === selectedSheetId)?.name ?? '';
     } catch {
@@ -85,9 +84,9 @@
   async function loadTabs(spreadsheetId, selectedTabName) {
     tabsVisible = true;
     tabsLoading = true;
-    tabs = [];
+    tabs        = [];
     try {
-      tabs = await api.getSheetTabs(spreadsheetId);
+      tabs        = await api.getSheetTabs(spreadsheetId);
       selectedTab = selectedTabName ?? '';
     } catch {
       tabs = [];
@@ -96,10 +95,10 @@
     }
   }
 
-  async function onSheetChange() {
+  async function handleSheetChange() {
     if (!selectedSheetId) {
       tabsVisible = false;
-      tabs = [];
+      tabs        = [];
       selectedTab = '';
       return;
     }
@@ -108,25 +107,25 @@
   }
 
   async function save() {
-    saving = true;
+    saving     = true;
     saveStatus = 'Saving…';
-    saveError = false;
+    saveError  = false;
     try {
       const res = await api.saveSheetsConfig({
-        spreadsheetId: selectedSheetId,
+        spreadsheetId:   selectedSheetId,
         spreadsheetName: selectedSheetName,
-        sheetTabName: selectedTab,
+        sheetTabName:    selectedTab,
       });
       if (res && !res.error) {
         saveStatus = 'Saved!';
         await refreshBadge();
         setTimeout(() => { saveStatus = ''; }, 2500);
       } else {
-        saveError = true;
+        saveError  = true;
         saveStatus = 'Save failed.';
       }
     } catch {
-      saveError = true;
+      saveError  = true;
       saveStatus = 'Network error.';
     } finally {
       saving = false;
@@ -171,7 +170,7 @@
       </div>
       <div class="modal-body">
 
-        {#if modalState_disconnected}
+        {#if disconnected}
           <div>
             <p class="modal-desc">Connect your Google account to export show data to a spreadsheet after each performance.</p>
             <a href="/api/auth/google" class="btn btn-primary modal-connect-btn">Connect Google Account</a>
@@ -181,7 +180,7 @@
           </div>
         {/if}
 
-        {#if modalState_connected}
+        {#if connected}
           <div>
             <div class="modal-account-row">
               <span class="modal-account-label">Connected as</span>
@@ -200,7 +199,7 @@
                   id="sheet-picker"
                   class="modal-select"
                   bind:value={selectedSheetId}
-                  onchange={onSheetChange}
+                  onchange={handleSheetChange}
                 >
                   <option value="">— Select a spreadsheet —</option>
                   {#each sheets as f (f.id)}

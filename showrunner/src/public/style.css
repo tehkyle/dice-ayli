@@ -25,7 +25,7 @@ html, body {
   height: 100%;
   background: var(--bg);
   color: var(--text);
-  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 18px;
   line-height: 1.4;
 }
@@ -207,7 +207,7 @@ html, body {
   color: var(--text);
 }
 
-/* Screen 2 — Cast rows */
+/* Cast rows */
 .screen-title {
   font-size: 1.6rem;
   font-weight: 700;
@@ -308,7 +308,7 @@ html, body {
   color: var(--danger);
   border-radius: 6px;
   padding: 14px 18px;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   font-weight: 600;
 }
 
@@ -351,7 +351,7 @@ html, body {
   display: flex;
   align-items: center;
   gap: 14px;
-  font-size: 1.35rem;
+  font-size: 1.4rem;
   font-weight: 700;
   color: var(--text);
 }
@@ -376,7 +376,7 @@ html, body {
 .lock-status {
   border-radius: 8px;
   padding: 20px 24px;
-  font-size: 1.15rem;
+  font-size: 1.1rem;
   font-weight: 700;
   text-align: center;
   letter-spacing: 0.03em;
@@ -399,7 +399,7 @@ html, body {
   display: none !important;
 }
 
-/* ── Scene selection screen ─────────────────────── */
+/* Scene selection */
 
 .act-rows {
   display: flex;
@@ -494,7 +494,7 @@ html, body {
 
 .btn-rig-toggle:hover,
 .btn-rig-toggle.active {
-  background: rgba(232, 196, 74, 0.12);
+  background: rgba(90, 168, 224, 0.12);
 }
 
 /* Ordered scene list */
@@ -528,7 +528,7 @@ html, body {
 
 .scene-order-item.drag-over {
   border-color: var(--accent);
-  background: rgba(232, 196, 74, 0.07);
+  background: rgba(90, 168, 224, 0.08);
 }
 
 .scene-order-handle {
@@ -540,7 +540,7 @@ html, body {
 
 .scene-order-name {
   flex: 1;
-  font-size: 0.95rem;
+  font-size: 1rem;
   font-weight: 600;
   color: var(--accent);
 }
@@ -553,7 +553,7 @@ html, body {
   width: 28px;
   height: 28px;
   cursor: pointer;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -588,7 +588,7 @@ html, body {
   color: var(--text);
 }
 
-/* ── History page ──────────────────────────────── */
+/* History page */
 
 body.history-page {
   min-height: 100vh;
@@ -729,7 +729,7 @@ body.history-page {
 }
 
 .history-track-sub {
-  font-size: 0.68rem;
+  font-size: 0.75rem;
   font-weight: 400;
   text-transform: none;
   letter-spacing: 0;
@@ -769,7 +769,7 @@ body.history-page {
 }
 
 .history-actor-name {
-  font-size: 0.95rem;
+  font-size: 1rem;
   font-weight: 600;
   color: var(--text);
 }
@@ -815,14 +815,14 @@ body.history-page {
 }
 
 .btn-history.primary:hover {
-  background: rgba(232, 196, 74, 0.08);
+  background: rgba(90, 168, 224, 0.12);
 }
 
 .history-delete-confirm {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 0.82rem;
+  font-size: 0.85rem;
   color: var(--danger);
   padding: 12px 20px;
   border-top: 1px solid var(--border);
@@ -833,7 +833,7 @@ body.history-page {
   flex: 1;
 }
 
-/* Edit mode — actor selects inside cast rows */
+/* Edit mode: inline selects */
 .history-cast-row .history-edit-select {
   flex: 1;
   background: var(--surface-2);
@@ -841,7 +841,7 @@ body.history-page {
   border: 1px solid var(--accent);
   border-radius: 4px;
   padding: 4px 8px;
-  font-size: 0.88rem;
+  font-size: 0.9rem;
   cursor: pointer;
 }
 
@@ -850,7 +850,7 @@ body.history-page {
   outline-offset: 1px;
 }
 
-/* ── History: scenes section ────────────────────────────────────────── */
+/* History: scenes */
 
 .history-scenes-section {
   border-top: 1px solid var(--border);
@@ -864,12 +864,12 @@ body.history-page {
   display: flex;
   align-items: baseline;
   gap: 10px;
-  font-size: 0.82rem;
+  font-size: 0.85rem;
 }
 
 .history-act-label {
   color: var(--text-dim);
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -884,7 +884,7 @@ body.history-page {
   word-break: break-word;
 }
 
-/* ── Gear / settings button ─────────────────────────────────────────── */
+/* Settings button */
 
 .welcome-header {
   display: flex;
@@ -928,7 +928,7 @@ body.history-page {
 .settings-badge.unconfigured { background: var(--danger); }
 .settings-badge.checking     { background: var(--border); }
 
-/* ── Modal overlay ──────────────────────────────────────────────────── */
+/* Modal */
 
 .modal-overlay {
   position: fixed;
@@ -995,11 +995,11 @@ body.history-page {
   gap: 20px;
 }
 
-/* ── Disconnected state ─────────────────────────────────────────────── */
+/* Disconnected state */
 
 .modal-desc {
   color: var(--text-dim);
-  font-size: 0.92rem;
+  font-size: 0.9rem;
   line-height: 1.55;
   margin: 0;
 }
@@ -1010,7 +1010,7 @@ body.history-page {
   display: inline-flex;
   align-items: center;
   padding: 12px 24px;
-  font-size: 0.95rem;
+  font-size: 1rem;
 }
 
 .modal-error {
@@ -1019,7 +1019,7 @@ body.history-page {
   margin: -8px 0 0;
 }
 
-/* ── Connected state ────────────────────────────────────────────────── */
+/* Connected state */
 
 .modal-account-row {
   display: flex;
@@ -1082,7 +1082,7 @@ body.history-page {
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 10px 14px;
-  font-size: 0.92rem;
+  font-size: 0.9rem;
   width: 100%;
   cursor: pointer;
   appearance: none;
@@ -1106,7 +1106,7 @@ body.history-page {
 
 .modal-actions .btn {
   padding: 11px 28px;
-  font-size: 0.92rem;
+  font-size: 0.9rem;
   min-width: 80px;
 }
 
@@ -1119,7 +1119,7 @@ body.history-page {
   color: var(--danger);
 }
 
-/* ── Go panel ─────────────────────────────────────────────────────── */
+/* Go panel */
 
 .progress-go-panel {
   display: flex;
@@ -1138,7 +1138,7 @@ body.history-page {
 }
 
 .progress-next-label {
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 700;
   color: var(--text-dim);
   text-transform: uppercase;
@@ -1175,7 +1175,7 @@ body.history-page {
   cursor: not-allowed;
 }
 
-/* ── Show In Progress screen ──────────────────────────────────────── */
+/* Show in progress */
 
 .progress-meta {
   display: flex;
@@ -1211,7 +1211,7 @@ body.history-page {
   border-radius: 4px;
   color: var(--text-dim);
   cursor: pointer;
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   font-weight: 600;
   letter-spacing: 0.02em;
   padding: 3px 10px;
@@ -1310,7 +1310,7 @@ body.history-page {
   50%       { opacity: 1; }
 }
 
-/* ── Show Summary screen ──────────────────────────────────────────── */
+/* Show summary */
 
 .summary-stats {
   display: flex;
@@ -1325,7 +1325,7 @@ body.history-page {
 }
 
 .summary-stat-label {
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 700;
   color: var(--text-dim);
   text-transform: uppercase;
@@ -1366,7 +1366,7 @@ body.history-page {
 .summary-act-label {
   width: 60px;
   flex-shrink: 0;
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 700;
   color: var(--text-dim);
   text-transform: uppercase;
@@ -1419,7 +1419,7 @@ body.history-page {
   padding: 14px 32px;
 }
 
-/* ── App version label ───────────────────────────────────────────── */
+/* Show controls + version */
 .progress-show-controls {
   display: flex;
   gap: 12px;
@@ -1434,7 +1434,7 @@ body.history-page {
   border-radius: 4px;
   color: var(--text-dim);
   cursor: pointer;
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   font-weight: 600;
   letter-spacing: 0.02em;
   padding: 5px 14px;

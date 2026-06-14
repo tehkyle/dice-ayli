@@ -17,6 +17,7 @@
 require('dotenv').config();
 const dgram = require('dgram');
 const { Client } = require('node-osc');
+const { extractWorkspaceId } = require('./utils');
 
 const QLAB_HOST      = process.env.QLAB_HOST || '127.0.0.1';
 const QLAB_SEND_PORT = parseInt(process.env.QLAB_SEND_PORT, 10) || 53000;
@@ -47,12 +48,6 @@ function parseBody(buf) {
     const raw = buf.slice(addrLen + typeLen).toString('utf8').replace(/\0/g, '').trim();
     return JSON.parse(raw);
   } catch { return null; }
-}
-
-function extractWorkspaceId(body) {
-  if (body?.workspace_id) return body.workspace_id;
-  if (Array.isArray(body?.data) && body.data[0]?.workspace_id) return body.data[0].workspace_id;
-  return null;
 }
 
 function send(client, ...args) {
