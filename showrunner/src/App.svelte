@@ -15,7 +15,8 @@
   import ConfirmScreen from './screens/ConfirmScreen.svelte';
   import ProgressScreen from './screens/ProgressScreen.svelte';
   import SummaryScreen from './screens/SummaryScreen.svelte';
-  import SheetsModal from './components/SheetsModal.svelte';
+  import SettingsModal from './components/SettingsModal.svelte';
+  import SettingsBadge from './components/SettingsBadge.svelte';
 
   let appVersion = $state('');
 
@@ -86,7 +87,8 @@
   </div>
 {/if}
 
-<SheetsModal />
+<div class="global-settings-badge"><SettingsBadge /></div>
+<SettingsModal />
 
 {#if appVersion}
   <div class="app-version">v{appVersion}</div>

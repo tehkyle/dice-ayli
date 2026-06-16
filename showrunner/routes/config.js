@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 
 const { readSheetsConfig, saveSheetTarget } = require('../integrations/sheetsConfig');
+const { applyNetworkConfig } = require('../osc/qlabBridge');
 
 const CONFIG_PATH = path.join(__dirname, '../config.json');
 
@@ -30,6 +31,27 @@ router.post('/sheets', (req, res) => {
     return res.status(400).json({ error: 'spreadsheetId and sheetTabName are required' });
   }
   saveSheetTarget({ spreadsheetId, spreadsheetName: spreadsheetName || '', sheetTabName });
+  res.json({ success: true });
+});
+
+// POST /api/config/qlab — save QLab connection settings (host/ports/workspace/passcode).
+// Every field is optional; empty values fall back to the bridge's built-in defaults.
+router.post('/qlab', (req, res) => {
+  const body   = req.body || {};
+  const config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
+
+  for (const key of ['qlabHost', 'qlabWorkspace', 'qlabPasscode']) {
+    if (key in body) config[key] = String(body[key] ?? '').trim();
+  }
+  for (const key of ['qlabSendPort', 'qlabReceivePort']) {
+    if (key in body) {
+      const port = parseInt(body[key], 10);
+      config[key] = (port >= 1 && port <= 65535) ? port : '';
+    }
+  }
+
+  fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf8');
+  applyNetworkConfig();
   res.json({ success: true });
 });
 

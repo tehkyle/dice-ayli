@@ -1,44 +1,139 @@
 {
-  "qlabPasscode": 5436,
-  "qlabWorkspaceName": "ayli",
-  "qlabWorkspaceId": "",
+  "qlabHost": "",
+  "qlabSendPort": "",
+  "qlabReceivePort": "",
+  "qlabPasscode": "5436",
+  "qlabWorkspace": "ayli",
   "qlabMainCueList": "MAIN",
   "castConfirmedCue": "CAST_CONFIRMED",
   "actors": [
-    { "name": "Adele",  "subtitle": "", "image": "" },
-    { "name": "Ben",    "subtitle": "", "image": "" },
-    { "name": "Beth",   "subtitle": "", "image": "" },
-    { "name": "Emily",  "subtitle": "", "image": "" },
-    { "name": "James",  "subtitle": "", "image": "" },
-    { "name": "Jazz",   "subtitle": "", "image": "" },
-    { "name": "Jerik",  "subtitle": "", "image": "" },
-    { "name": "Kate",   "subtitle": "", "image": "" },
-    { "name": "Mike",   "subtitle": "", "image": "" }
+    {
+      "name": "Adele",
+      "subtitle": "",
+      "image": ""
+    },
+    {
+      "name": "Ben",
+      "subtitle": "",
+      "image": ""
+    },
+    {
+      "name": "Beth",
+      "subtitle": "",
+      "image": ""
+    },
+    {
+      "name": "Emily",
+      "subtitle": "",
+      "image": ""
+    },
+    {
+      "name": "James",
+      "subtitle": "",
+      "image": ""
+    },
+    {
+      "name": "Jazz",
+      "subtitle": "",
+      "image": ""
+    },
+    {
+      "name": "Jerik",
+      "subtitle": "",
+      "image": ""
+    },
+    {
+      "name": "Kate",
+      "subtitle": "",
+      "image": ""
+    },
+    {
+      "name": "Mike",
+      "subtitle": "",
+      "image": ""
+    }
   ],
   "characterTracks": [
-    { "id": "Track_1", "label": "Track 1", "subtitle": "Rosalind" },
-    { "id": "Track_2", "label": "Track 2", "subtitle": "Celia / Adam" },
-    { "id": "Track_3", "label": "Track 3", "subtitle": "Orlando / Corin" },
-    { "id": "Track_4", "label": "Track 4", "subtitle": "Oliver / Touchstone" },
-    { "id": "Track_5", "label": "Track 5", "subtitle": "Silvius / Duke Frederick / Duke Senior" },
-    { "id": "Track_6", "label": "Track 6", "subtitle": "Phebe / Jaques / Charles" }
+    {
+      "id": "Track_1",
+      "label": "Track 1",
+      "subtitle": "Rosalind"
+    },
+    {
+      "id": "Track_2",
+      "label": "Track 2",
+      "subtitle": "Celia / Adam"
+    },
+    {
+      "id": "Track_3",
+      "label": "Track 3",
+      "subtitle": "Orlando / Corin"
+    },
+    {
+      "id": "Track_4",
+      "label": "Track 4",
+      "subtitle": "Oliver / Touchstone"
+    },
+    {
+      "id": "Track_5",
+      "label": "Track 5",
+      "subtitle": "Silvius / Duke Frederick / Duke Senior"
+    },
+    {
+      "id": "Track_6",
+      "label": "Track 6",
+      "subtitle": "Phebe / Jaques / Charles"
+    }
   ],
   "acts": [
     {
       "id": "A2_SCENES",
       "label": "Act 2",
-      "scenes": ["2A", "2B", "2C", "2D", "2E"]
+      "scenes": [
+        "2A",
+        "2B",
+        "2C",
+        "2D",
+        "2E"
+      ]
     },
     {
       "id": "A3_SCENES",
       "label": "Act 3",
-      "scenes": ["3A", "3B", "3C", "3D", "3E", "3F"]
+      "scenes": [
+        "3A",
+        "3B",
+        "3C",
+        "3D",
+        "3E",
+        "3F"
+      ]
     },
     {
       "id": "A4_SCENES",
       "label": "Act 4",
-      "scenes": ["4A", "4B", "4C", "4D", "4E"]
+      "scenes": [
+        "4A",
+        "4B",
+        "4C",
+        "4D",
+        "4E"
+      ]
     }
   ],
-  "staticScenes": ["1.1", "1.2", "Entr'acte 1", "2 Finale", "Entr'acte 2", "3 Finale", "Entr'acte 3", "4 Finale", "Entr'acte 4", "5.1", "5.2", "5.3", "Encore"]
+  "staticScenes": [
+    "1.1",
+    "1.2",
+    "Entr'acte 1",
+    "2 Finale",
+    "Entr'acte 2",
+    "3 Finale",
+    "Entr'acte 3",
+    "4 Finale",
+    "Entr'acte 4",
+    "5.1",
+    "5.2",
+    "5.3",
+    "Encore"
+  ]
 }

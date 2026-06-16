@@ -7,7 +7,6 @@
   import { loadConfig } from '../stores/config.svelte.js';
   import { initScenesFromActs } from '../stores/scenes.svelte.js';
   import { initCastFromTracks } from '../stores/cast.svelte.js';
-  import SettingsBadge from '../components/SettingsBadge.svelte';
   import QlabStatus from '../components/QlabStatus.svelte';
 
   const today = toIsoDate();
@@ -108,9 +107,6 @@
 </script>
 
 <div class="screen-inner">
-  <div class="welcome-header">
-    <SettingsBadge />
-  </div>
   <img src="/images/logo.png" alt="Dacha logo" class="app-logo" />
   <h1 class="app-title">Dacha DICE: AYLI</h1>
   <div class="show-meta">

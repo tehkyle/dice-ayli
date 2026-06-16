@@ -26,6 +26,7 @@ export const api = {
   deleteAuth:       ()          => fetch('/api/auth/google', { method: 'DELETE' }),
   getSheetsConfig:  ()          => json('GET',    '/api/config/sheets'),
   saveSheetsConfig: (body)      => json('POST',   '/api/config/sheets', body),
+  saveQlabConfig:   (body)      => json('POST',   '/api/config/qlab', body),
   listSheets:       ()          => json('GET',    '/api/sheets/list'),
   getSheetTabs:     (id)        => json('GET',    `/api/sheets/${id}/tabs`),
 };

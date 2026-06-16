@@ -4,10 +4,19 @@ const EventEmitter = require('events');
 const { Client, Server } = require('node-osc');
 const { extractWorkspaceId } = require('../utils');
 
-// ── Network config (override via .env) ────────────────────────────────────────
-const QLAB_HOST         = process.env.QLAB_HOST || '127.0.0.1';
-const QLAB_SEND_PORT    = parseInt(process.env.QLAB_SEND_PORT,  10) || 53000;
-const QLAB_RECEIVE_PORT = parseInt(process.env.QLAB_RECEIVE_PORT, 10) || 53001;
+// ── Network config (config.json → .env → default) ──────────────────────────────
+const DEFAULT_HOST         = '127.0.0.1';
+const DEFAULT_SEND_PORT    = 53000;
+const DEFAULT_RECEIVE_PORT = 53001;
+
+function resolveNetwork() {
+  const { qlabHost, qlabSendPort, qlabReceivePort } = loadConfig();
+  return {
+    host:        (qlabHost || '').trim() || process.env.QLAB_HOST || DEFAULT_HOST,
+    sendPort:    parseInt(qlabSendPort, 10)    || parseInt(process.env.QLAB_SEND_PORT, 10)    || DEFAULT_SEND_PORT,
+    receivePort: parseInt(qlabReceivePort, 10) || parseInt(process.env.QLAB_RECEIVE_PORT, 10) || DEFAULT_RECEIVE_PORT,
+  };
+}
 
 // ── Timing constants ───────────────────────────────────────────────────────────
 const WORKSPACE_DISCOVER_MS = 2000;
@@ -20,7 +29,8 @@ const PLAYHEAD_QUERY_MS     = 500;
 const OSC = {
   workspaces: ()                   => '/workspaces',
   connect:    (ws)                 => `/workspace/${ws}/connect`,
-  updates:    (ws)                 => `/workspace/${ws}/updates`,
+  // Global toggle, not workspace-scoped — QLab has no /workspace/{ws}/updates address.
+  updates:    ()                   => '/updates',
   cue:        (ws, id, cmd)        => ws ? `/workspace/${ws}/cue/${id}/${cmd}` : `/cue/${id}/${cmd}`,
   cueById:    (ws, id, prop)       => `/workspace/${ws}/cue_id/${id}/${prop}`,
   panic:      (ws)                 => ws ? `/workspace/${ws}/panic` : '/panic',
@@ -33,13 +43,17 @@ replyBus.setMaxListeners(20);
 
 // Single persistent UDP client — never closed between sends.
 // Creating+closing per-send races the async UDP write and drops packets.
-const oscClient = new Client(QLAB_HOST, QLAB_SEND_PORT);
+// node-osc's Client reads .host/.port live on every send, so reconfiguring
+// is just mutating these fields — no socket recreation needed.
+const initialNetwork = resolveNetwork();
+const oscClient = new Client(initialNetwork.host, initialNetwork.sendPort);
 
 let workspaceId        = null;
 let connected          = false;
 let activeShowId       = null;
 let lastKnownCueNumber = null;
 let currentPlayhead    = { cueNumber: '', cueName: '' };
+let receiverServer     = null;
 
 let _db = null;
 let _io = null;
@@ -56,10 +70,11 @@ function loadConfig() {
   return JSON.parse(fs.readFileSync(path.join(__dirname, '../config.json'), 'utf8'));
 }
 
-// Resolve the OSC workspace qualifier (UUID → name → discovered UUID → null for broadcast).
+// Resolve the OSC workspace qualifier (configured name/UUID → discovered UUID → null for broadcast).
+// QLab's OSC address accepts either the workspace's display name or its UUID interchangeably.
 function workspaceQualifier() {
-  const { qlabWorkspaceId, qlabWorkspaceName } = loadConfig();
-  return qlabWorkspaceId || qlabWorkspaceName || workspaceId || null;
+  const { qlabWorkspace } = loadConfig();
+  return qlabWorkspace || workspaceId || null;
 }
 
 function cueAddress(trackId, command) {
@@ -135,7 +150,7 @@ async function connectQLab() {
   if (status === 'ok') {
     connected = true;
     log('Connected to QLab workspace');
-    subscribeToUpdates(ws);
+    subscribeToUpdates();
   } else {
     logErr(`Connect failed: ${status}`);
   }
@@ -143,8 +158,8 @@ async function connectQLab() {
   return status;
 }
 
-function subscribeToUpdates(ws) {
-  const addr = OSC.updates(ws);
+function subscribeToUpdates() {
+  const addr = OSC.updates();
   logOut(addr);
   oscClient.send(addr, 1);
 }
@@ -384,10 +399,8 @@ function endShow(showId) {
 
 // ── OSC receiver ───────────────────────────────────────────────────────────────
 
-function startReceiver(db, io) {
-  _db = db;
-  _io = io;
-  const server = new Server(QLAB_RECEIVE_PORT, '0.0.0.0');
+function createReceiverServer(port) {
+  const server = new Server(port, '0.0.0.0');
 
   server.on('message', (msg) => {
     const [address, ...args] = msg;
@@ -433,18 +446,18 @@ function startReceiver(db, io) {
       if (!sceneName) return;
       try {
         const { nextId } = require('../db/database');
-        db.data.scene_log.push({
-          id:         nextId(db.data.scene_log),
+        _db.data.scene_log.push({
+          id:         nextId(_db.data.scene_log),
           show_id:    activeShowId,
           scene_name: sceneName,
           position:   null,
           timestamp:  new Date().toISOString(),
         });
-        db.write();
+        _db.write();
       } catch (err) {
         logErr(`scene_log insert failed: ${err.message}`);
       }
-      if (io) io.emit('scene_started', { scene: sceneName, time: ts() });
+      if (_io) _io.emit('scene_started', { scene: sceneName, time: ts() });
       return;
     }
 
@@ -456,12 +469,37 @@ function startReceiver(db, io) {
 
   server.on('error', (err) => logErr(`Receiver: ${err.message}`));
 
-  log(`Receiver listening on UDP port ${QLAB_RECEIVE_PORT}`);
+  log(`Receiver listening on UDP port ${port}`);
   return server;
+}
+
+function startReceiver(db, io) {
+  _db = db;
+  _io = io;
+  receiverServer = createReceiverServer(resolveNetwork().receivePort);
+  return receiverServer;
+}
+
+// Re-reads config.json and applies host/port changes to the live client/receiver.
+// Always drops the current session so the next send re-discovers/re-connects —
+// this is also what makes a workspace-name/passcode-only change take effect.
+function applyNetworkConfig() {
+  const { host, sendPort, receivePort } = resolveNetwork();
+  oscClient.host = host;
+  oscClient.port = sendPort;
+  connected      = false;
+  workspaceId    = null;
+
+  if (receiverServer && receiverServer.port !== receivePort) {
+    receiverServer.close();
+    receiverServer = createReceiverServer(receivePort);
+  }
+  log(`Network config applied: ${host}:${sendPort} (recv ${receivePort})`);
 }
 
 module.exports = {
   startReceiver,
+  applyNetworkConfig,
   checkQLab,
   setActiveShow,
   endShow,
