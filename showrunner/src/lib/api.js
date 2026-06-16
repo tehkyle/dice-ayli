@@ -9,6 +9,7 @@ export const api = {
   getActiveShow:    ()          => json('GET',    '/api/shows/active'),
   createShow:       ()          => json('POST',   '/api/shows', {}),
   deleteShow:       (id)        => fetch(`/api/shows/${id}`, { method: 'DELETE' }),
+  clearAllShows:    ()          => fetch('/api/shows', { method: 'DELETE' }),
   endShow:          (id)        => fetch(`/api/shows/${id}/end`,    { method: 'POST' }),
   cancelShow:       (id)        => json('POST',   `/api/shows/${id}/cancel`),
   lockCast:         (id, body)  => json('POST',   `/api/shows/${id}/cast`, body),

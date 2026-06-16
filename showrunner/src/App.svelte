@@ -7,6 +7,7 @@
   import { castData } from './stores/cast.svelte.js';
   import { progressData } from './stores/progress.svelte.js';
   import { loadConfig } from './stores/config.svelte.js';
+  import { MAX_SHOW_RUN_MS } from './lib/format.js';
 
   import HistoryScreen from './screens/HistoryScreen.svelte';
   import WelcomeScreen from './screens/WelcomeScreen.svelte';
@@ -40,7 +41,8 @@
     // Resume an in-progress show after a browser refresh or server restart
     try {
       const active = await api.getActiveShow();
-      if (active) {
+      const abandoned = active && Date.now() - new Date(active.locked_at) > MAX_SHOW_RUN_MS;
+      if (active && !abandoned) {
         await loadConfig();
 
         showData.id          = active.id;

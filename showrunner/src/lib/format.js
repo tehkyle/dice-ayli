@@ -1,3 +1,5 @@
+export const MAX_SHOW_RUN_MS = 3 * 60 * 60 * 1000; // ponytail: 3h cutoff for "abandoned" shows, raise if a real show ever runs longer
+
 export function formatDate(dateStr) {
   const d = new Date(dateStr + 'T00:00:00');
   return d.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });

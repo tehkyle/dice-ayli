@@ -1,5 +1,5 @@
 <script>
-  import { formatTime, formatRunTime, formatDurationReport, actorImageUrl } from '../lib/format.js';
+  import { formatTime, formatRunTime, formatDurationReport, actorImageUrl, MAX_SHOW_RUN_MS } from '../lib/format.js';
   import { api } from '../lib/api.js';
 
   let { show, tracks, actors, acts, ondeleted } = $props();
@@ -52,11 +52,14 @@
   }
 
   const castByTrack = $derived(Object.fromEntries((show.cast ?? []).map(a => [a.character_track, a.actor_name])));
+  const matchedActs = $derived(acts.filter(act => show.scenes_played?.some(e => act.scenes.includes(e.scene_name))));
   const headerTime = $derived.by(() => {
     if (!show.locked_at) return 'Not locked';
     const start = formatTime(show.locked_at);
-    const run   = show.ended_at ? formatRunTime(show.locked_at, show.ended_at) : null;
-    return run ? `${start}  ·  ${run}` : start;
+    if (!show.ended_at) return start;
+    const ranLong = new Date(show.ended_at) - new Date(show.locked_at) > MAX_SHOW_RUN_MS;
+    const run = ranLong ? 'Unfinished' : formatRunTime(show.locked_at, show.ended_at);
+    return `${start}  ·  ${run}`;
   });
 </script>
 
@@ -67,13 +70,13 @@
   </div>
 
   <div class="history-cast-list">
-    {#each tracks as track}
+    {#each tracks as track, i}
       {@const actorName = castByTrack[track.id]}
       {@const actor = actorName ? actorMap[actorName] : null}
       <div class="history-cast-row">
         <div class="history-track-label">
-          {track.label}
-          {#if track.subtitle}<span class="history-track-sub">{track.subtitle}</span>{/if}
+          <span class="history-track-num">{i + 1}</span>
+          {#if track.subtitle}<span class="history-track-sub" title={track.subtitle}>{track.subtitle}</span>{/if}
         </div>
 
         {#if editMode}
@@ -85,21 +88,21 @@
           </select>
         {:else}
           <div class="history-actor">
+            <div class="history-actor-name">{actorName || '—'}</div>
             {#if actor?.image}
               <img class="history-actor-img" src={actorImageUrl(actor.image)} alt={actorName} />
             {:else if actorName}
               <div class="history-actor-initial">{actorName[0].toUpperCase()}</div>
             {/if}
-            <div class="history-actor-name">{actorName || '—'}</div>
           </div>
         {/if}
       </div>
     {/each}
   </div>
 
-  {#if show.scenes_played?.length > 0 && acts.length > 0}
+  {#if matchedActs.length > 0}
     <div class="history-scenes-section">
-      {#each acts as act}
+      {#each matchedActs as act}
         {@const actScenes = show.scenes_played.filter(e => act.scenes.includes(e.scene_name))}
         {#if actScenes.length > 0}
           <div class="history-act-row">

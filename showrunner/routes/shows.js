@@ -102,6 +102,15 @@ router.delete('/:id', (req, res) => {
   res.json({ success: true });
 });
 
+// DELETE /api/shows — remove all shows and cast assignments
+router.delete('/', (req, res) => {
+  const db = getDb();
+  db.data.shows = [];
+  db.data.cast_assignments = [];
+  db.write();
+  res.json({ success: true });
+});
+
 // GET /api/shows — all shows with cast and scene log, newest first
 // performance_number is each show's 1-based rank when sorted by id
 router.get('/', (req, res) => {

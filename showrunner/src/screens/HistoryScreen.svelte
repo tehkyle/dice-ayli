@@ -10,6 +10,7 @@
   let acts = $state([]);
   let error = $state('');
   let loading = $state(true);
+  let clearConfirm = $state(false);
 
   // Shows grouped by date: [{ date, shows[] }]
   let grouped = $derived.by(() => {
@@ -40,12 +41,33 @@
   function handleDeleted(showId) {
     shows = shows.filter(s => s.id !== showId);
   }
+
+  async function clearAll() {
+    try {
+      await api.clearAllShows();
+      shows = [];
+    } catch {
+      error = 'Failed to clear history.';
+    }
+    clearConfirm = false;
+  }
 </script>
 
 <div class="history-page">
   <header class="history-header">
     <a href="/" class="history-back">← Back to Showrunner</a>
     <h1 class="history-title">Show History</h1>
+    {#if shows.length > 0}
+      {#if clearConfirm}
+        <span class="history-clear-confirm">
+          Delete ALL shows permanently?
+          <button class="btn-history danger" onclick={clearAll}>Yes, clear all</button>
+          <button class="btn-history" onclick={() => clearConfirm = false}>Cancel</button>
+        </span>
+      {:else}
+        <button class="btn-history danger history-clear-all" onclick={() => clearConfirm = true}>Clear all</button>
+      {/if}
+    {/if}
   </header>
 
   <div id="history-root">
