@@ -40,5 +40,5 @@
       "scenes": ["4A", "4B", "4C", "4D", "4E"]
     }
   ],
-  "staticScenes": ["1.1", "1.2", "Entr'acte 1", "2 Finale", "Entr'acte 2", "Entr'acte 3", "4 Finale", "Entr'acte 4", "5.1", "5.2", "5.3", "Encore"]
+  "staticScenes": ["1.1", "1.2", "Entr'acte 1", "2 Finale", "Entr'acte 2", "3 Finale", "Entr'acte 3", "4 Finale", "Entr'acte 4", "5.1", "5.2", "5.3", "Encore"]
 }

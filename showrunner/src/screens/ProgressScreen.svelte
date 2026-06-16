@@ -14,6 +14,7 @@
       : new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
   );
   let going = $state(false);
+  let goError = $state('');
   let sceneListEl = $state(null);
   let reconnecting = $state(false);
   let reconnectResult = $state(null); // null | 'ok' | 'failed'
@@ -35,7 +36,13 @@
 
   async function go() {
     going = true;
-    try { await api.postGo(); } catch {}
+    goError = '';
+    try {
+      const res = await api.postGo();
+      if (res?.error) goError = 'GO failed — QLab is not responding. Try reconnecting above.';
+    } catch {
+      goError = 'GO failed — could not reach the server.';
+    }
     await fetchPlayhead();
     setTimeout(() => { going = false; }, 800);
   }
@@ -62,7 +69,16 @@
 
   async function restartShow() {
     if (!confirm('Cancel this show and restart from the beginning?')) return;
-    try { await api.cancelShow(showData.id); } catch {}
+    try {
+      const res = await api.cancelShow(showData.id);
+      if (res?.error) {
+        alert(`Could not cancel show: ${res.error}`);
+        return;
+      }
+    } catch {
+      alert('Could not reach server. Show was not cancelled.');
+      return;
+    }
     resetProgress();
     resetShow();
     nav.screen = 'welcome';
@@ -141,6 +157,9 @@
       <span class="progress-next-label">Next</span>
       <span class="progress-next-value">{nextCueDisplay}</span>
     </div>
+    {#if goError}
+      <div class="go-error">{goError}</div>
+    {/if}
     <button class="btn btn-primary btn-go" disabled={going} onclick={go}>
       {going ? 'Sending…' : 'GO'}
     </button>

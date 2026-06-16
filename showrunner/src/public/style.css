@@ -92,6 +92,19 @@ html, body {
   color: var(--text);
 }
 
+/* Stuck show warning on welcome screen */
+.stuck-show-banner {
+  background: var(--warn-bg);
+  border: 1px solid var(--warn);
+  border-radius: 6px;
+  color: var(--warn);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 0.9rem;
+  padding: 12px 16px;
+}
+
 /* QLab status */
 .qlab-status {
   display: flex;
@@ -1154,6 +1167,18 @@ body.history-page {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.go-error {
+  background: var(--danger-bg);
+  border: 2px solid var(--danger);
+  border-radius: 6px;
+  color: var(--danger);
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 14px 18px;
+  text-align: center;
+  line-height: 1.4;
 }
 
 .btn-go {

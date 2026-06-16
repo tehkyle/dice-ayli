@@ -6,7 +6,7 @@
   <span class="status-dot {reachable === null ? 'checking' : reachable ? (missingVars.length ? 'warn' : 'ok') : 'offline'}"></span>
   <span>{statusText}</span>
 </div>
-{#if missingVars.length > 0}
+{#if reachable && missingVars.length > 0}
   <div class="qlab-missing">
     <strong>Missing cues in QLab:</strong>
     {#each missingVars as v, i}

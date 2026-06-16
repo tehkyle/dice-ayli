@@ -78,8 +78,10 @@ router.post('/:id/end', (req, res) => {
 router.post('/:id/cancel', (req, res) => {
   const db     = getDb();
   const showId = parseInt(req.params.id, 10);
-  const show   = db.data.shows.find(s => s.id === showId);
-  if (show && !show.ended_at) {
+  if (isNaN(showId)) return res.status(400).json({ error: 'Invalid show ID' });
+  const show = db.data.shows.find(s => s.id === showId);
+  if (!show) return res.status(404).json({ error: 'Show not found' });
+  if (!show.ended_at) {
     show.ended_at = new Date().toISOString();
     db.write();
   }

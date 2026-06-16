@@ -284,6 +284,10 @@ async function sendPanicAll() {
 async function checkQLab(trackIds) {
   await ensureConnected();
 
+  if (!connected) {
+    return { reachable: false, missingVars: [] };
+  }
+
   return new Promise((resolve) => {
     let reachable = false;
     let finished  = false;

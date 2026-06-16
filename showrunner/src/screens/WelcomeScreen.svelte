@@ -18,6 +18,7 @@
   let showRetry = $state(false);
   let beginDisabled = $state(true);
   let beginning = $state(false);
+  let stuckShowId = $state(null);
 
   async function checkQlab() {
     qlabReachable = null;
@@ -74,6 +75,16 @@
     }
   }
 
+  async function clearStuckShow() {
+    if (!stuckShowId) return;
+    try {
+      await api.cancelShow(stuckShowId);
+      stuckShowId = null;
+    } catch {
+      alert('Could not clear the interrupted show. Check server connection.');
+    }
+  }
+
   onMount(async () => {
     api.getPlayhead().catch(() => {});
 
@@ -83,6 +94,14 @@
     } catch {
       showData.perfLabel = 'Performance #—';
     }
+
+    // If the user lands on the welcome screen while a show is still marked active
+    // in the DB (e.g. a restart that failed to cancel), surface it here so they
+    // can clear it rather than being silently sent back to progress on next refresh.
+    try {
+      const active = await api.getActiveShow();
+      if (active) stuckShowId = active.id;
+    } catch {}
 
     await checkQlab();
   });
@@ -98,6 +117,12 @@
     <div class="meta-date">{formatDate(today)}</div>
     <div class="meta-perf">{showData.perfLabel}</div>
   </div>
+  {#if stuckShowId}
+    <div class="stuck-show-banner">
+      A previous show did not finish closing. Refreshing will resume it.
+      <button class="btn-link danger" onclick={clearStuckShow}>Clear it</button>
+    </div>
+  {/if}
   <QlabStatus reachable={qlabReachable} missingVars={qlabMissing} statusText={qlabText} />
   <div class="screen-actions">
     <button class="btn btn-primary btn-xl" disabled={beginDisabled || beginning} onclick={begin}>
