@@ -1,8 +1,11 @@
-require('dotenv').config();
-const express = require('express');
-const http = require('http');
-const { Server: SocketIO } = require('socket.io');
 const path = require('path');
+try {
+  process.loadEnvFile(path.join(__dirname, '.env'));
+} catch (err) {
+  if (err.code !== 'ENOENT') throw err;
+}
+
+const express = require('express');
 
 const { getDb } = require('./db/database');
 const { startReceiver, setActiveShow } = require('./osc/qlabBridge');
@@ -11,12 +14,11 @@ const configRouter = require('./routes/config');
 const qlabRouter   = require('./routes/qlab');
 const authRouter   = require('./routes/auth');
 const sheetsRouter = require('./routes/sheets');
+const { router: eventsRouter, broadcast } = require('./routes/events');
 
 const PORT = parseInt(process.env.PORT, 10) || 3000;
 
 const app = express();
-const httpServer = http.createServer(app);
-const io = new SocketIO(httpServer);
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -32,6 +34,7 @@ app.use('/api/config', configRouter);
 app.use('/api/qlab',   qlabRouter);
 app.use('/api/auth',   authRouter);
 app.use('/api/sheets', sheetsRouter);
+app.use('/api/events', eventsRouter);
 
 const db = getDb();
 
@@ -41,13 +44,8 @@ if (midShowShow) {
   console.log(`[SERVER] Restored active show ID: ${midShowShow.id}`);
 }
 
-startReceiver(db, io);
+startReceiver(db, broadcast);
 
-io.on('connection', (socket) => {
-  console.log(`[WS] Client connected: ${socket.id}`);
-  socket.on('disconnect', () => console.log(`[WS] Client disconnected: ${socket.id}`));
-});
-
-httpServer.listen(PORT, () => {
+app.listen(PORT, () => {
   console.log(`[SERVER] Dacha DICE: AYLI running at http://localhost:${PORT}`);
 });

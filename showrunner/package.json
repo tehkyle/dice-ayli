@@ -5,7 +5,7 @@
   "main": "electron-main.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "concurrently \"node --watch server.js\" \"vite\"",
+    "dev": "node --watch server.js & vite",
     "build": "vite build",
     "electron": "npm run build && electron .",
     "dist": "npm run build && electron-builder --mac --publish never",
@@ -14,16 +14,13 @@
     "release": "bash scripts/release.sh"
   },
   "dependencies": {
-    "dotenv": "^16.4.5",
     "electron-updater": "^6.8.3",
     "express": "^4.19.2",
     "googleapis": "^144.0.0",
-    "node-osc": "^9.1.0",
-    "socket.io": "^4.7.5"
+    "node-osc": "^9.1.0"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.1.2",
-    "concurrently": "^9.2.1",
     "electron": "^33.0.0",
     "electron-builder": "^26.8.1",
     "svelte": "^5.55.9",

@@ -56,7 +56,7 @@ let currentPlayhead    = { cueNumber: '', cueName: '' };
 let receiverServer     = null;
 
 let _db = null;
-let _io = null;
+let _broadcast = null;
 
 // ── Logging ────────────────────────────────────────────────────────────────────
 const ts     = () => new Date().toISOString();
@@ -364,7 +364,7 @@ function endShow(showId) {
   if (showId == null || !_db) return;
   activeShowId = null;
 
-  if (_io) _io.emit('show_ended', { showId, time: new Date().toISOString() });
+  if (_broadcast) _broadcast('show_ended', { showId, time: new Date().toISOString() });
 
   try {
     const { appendShowToSheet } = require('../integrations/googleSheets');
@@ -389,7 +389,7 @@ function endShow(showId) {
 
     appendShowToSheet(show, performanceNumber, castAssignments, scenesPlayed)
       .then(result => {
-        if (result && !result.success && _io) _io.emit('sheets_error');
+        if (result && !result.success && _broadcast) _broadcast('sheets_error', null);
       })
       .catch(err => logErr(err.message));
   } catch (err) {
@@ -457,7 +457,7 @@ function createReceiverServer(port) {
       } catch (err) {
         logErr(`scene_log insert failed: ${err.message}`);
       }
-      if (_io) _io.emit('scene_started', { scene: sceneName, time: ts() });
+      if (_broadcast) _broadcast('scene_started', { scene: sceneName, time: ts() });
       return;
     }
 
@@ -473,9 +473,9 @@ function createReceiverServer(port) {
   return server;
 }
 
-function startReceiver(db, io) {
+function startReceiver(db, broadcast) {
   _db = db;
-  _io = io;
+  _broadcast = broadcast;
   receiverServer = createReceiverServer(resolveNetwork().receivePort);
   return receiverServer;
 }

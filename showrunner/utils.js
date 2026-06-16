@@ -1,16 +1,20 @@
 const { google } = require('googleapis');
 
+function createOAuth2Client(redirectUri) {
+  return new google.auth.OAuth2(
+    process.env.GOOGLE_OAUTH_CLIENT_ID,
+    process.env.GOOGLE_OAUTH_CLIENT_SECRET,
+    redirectUri
+  );
+}
+
 // Builds an unauthenticated OAuth2 client from the current request context.
 // Used by both the auth flow and the authenticated sheets client.
 function buildOAuthClient(req) {
   const proto       = req.headers['x-forwarded-proto'] || req.protocol;
   const host        = req.headers['x-forwarded-host']  || req.headers.host;
   const redirectUri = `${proto}://${host}/api/auth/google/callback`;
-  return new google.auth.OAuth2(
-    process.env.GOOGLE_OAUTH_CLIENT_ID,
-    process.env.GOOGLE_OAUTH_CLIENT_SECRET,
-    redirectUri
-  );
+  return createOAuth2Client(redirectUri);
 }
 
 // Enriches a show record with cast, scenes_played, and performance_number.
@@ -35,4 +39,4 @@ function extractWorkspaceId(body) {
   return null;
 }
 
-module.exports = { buildOAuthClient, formatShow, extractWorkspaceId };
+module.exports = { buildOAuthClient, createOAuth2Client, formatShow, extractWorkspaceId };

@@ -2,6 +2,7 @@ const fs   = require('fs');
 const path = require('path');
 
 const { getTokens, saveTokens, readSheetsConfig } = require('./sheetsConfig');
+const { createOAuth2Client } = require('../utils');
 
 function loadConfig() {
   return JSON.parse(fs.readFileSync(path.join(__dirname, '../config.json'), 'utf8'));
@@ -15,12 +16,7 @@ function buildAuth() {
   const tokens = getTokens();
   if (!tokens) throw new Error('[Sheets] No OAuth tokens — connect Google account via the config modal');
 
-  const { google } = require('googleapis');
-  const oauth2Client = new google.auth.OAuth2(
-    process.env.GOOGLE_OAUTH_CLIENT_ID,
-    process.env.GOOGLE_OAUTH_CLIENT_SECRET,
-    'urn:ietf:wg:oauth:2.0:oob'
-  );
+  const oauth2Client = createOAuth2Client('urn:ietf:wg:oauth:2.0:oob');
   oauth2Client.setCredentials(tokens);
   oauth2Client.on('tokens', (newTokens) => {
     saveTokens({ ...tokens, ...newTokens });
