@@ -1,0 +1,8 @@
+{
+  "name": "AYLI Camera",
+  "short_name": "AYLI Camera",
+  "start_url": "/camera",
+  "display": "standalone",
+  "background_color": "#0c0f14",
+  "theme_color": "#0c0f14"
+}

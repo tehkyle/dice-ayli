@@ -6,6 +6,11 @@
   "qlabWorkspace": "ayli",
   "qlabMainCueList": "MAIN",
   "castConfirmedCue": "CAST_CONFIRMED",
+  "photosPathCue": "PHOTOS_PATH",
+  "cameraHostname": "",
+  "cameraHttpsPort": 8443,
+  "cameraCertPath": "",
+  "cameraKeyPath": "",
   "actors": [
     {
       "name": "Adele",

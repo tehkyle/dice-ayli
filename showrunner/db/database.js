@@ -2,13 +2,13 @@ const fs   = require('fs');
 const path = require('path');
 
 const DB_PATH = path.join(__dirname, 'showrunner.json');
-const DEFAULT = { shows: [], cast_assignments: [], scene_log: [] };
+const DEFAULT = { shows: [], cast_assignments: [], scene_log: [], photos: [] };
 
 function readData() {
   try {
-    return JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
+    return { ...DEFAULT, ...JSON.parse(fs.readFileSync(DB_PATH, 'utf8')) };
   } catch {
-    return { ...DEFAULT, shows: [], cast_assignments: [], scene_log: [] };
+    return { ...DEFAULT, shows: [], cast_assignments: [], scene_log: [], photos: [] };
   }
 }
 

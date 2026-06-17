@@ -5,6 +5,7 @@
   import { progressData, appendScene, finalizeLastScene, resetProgress } from '../stores/progress.svelte.js';
   import { getSocket } from '../lib/socket.js';
   import { api } from '../lib/api.js';
+  import { photoWindowState } from '../stores/photoModal.svelte.js';
   import { formatCueDisplay } from '../lib/format.js';
   import ProgressSceneItem from '../components/ProgressSceneItem.svelte';
 
@@ -64,6 +65,7 @@
   async function forceEndShow() {
     if (!confirm('End the show and send the report to Sheets?')) return;
     try { await api.endShow(showData.id); } catch {}
+    photoWindowState.open = false;
     // Navigation happens via the show_ended socket event (same as normal end)
   }
 
@@ -79,6 +81,7 @@
       alert('Could not reach server. Show was not cancelled.');
       return;
     }
+    photoWindowState.open = false;
     resetProgress();
     resetShow();
     nav.screen = 'welcome';
