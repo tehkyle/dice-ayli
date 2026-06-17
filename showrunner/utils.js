@@ -33,6 +33,7 @@ function formatShow(show, allShows, db) {
     scenes_played: db.data.scene_log
       .filter(e => e.show_id === show.id)
       .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)),
+    photo_count: db.data.photos.filter(p => p.show_id === show.id).length,
   };
 }
 

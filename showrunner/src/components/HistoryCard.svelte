@@ -1,6 +1,7 @@
 <script>
   import { formatTime, formatRunTime, formatDurationReport, actorImageUrl, MAX_SHOW_RUN_MS } from '../lib/format.js';
   import { api } from '../lib/api.js';
+  import { openHistoryGallery } from '../stores/historyGallery.svelte.js';
 
   let { show, tracks, actors, acts, ondeleted } = $props();
 
@@ -138,6 +139,9 @@
   {:else}
     <div class="history-card-actions">
       <button class="btn-history" onclick={startEdit}>Edit cast</button>
+      {#if show.photo_count > 0}
+        <button class="btn-history" onclick={() => openHistoryGallery(show.id)}>Gallery</button>
+      {/if}
       <button class="btn-history danger" onclick={() => { deleteConfirm = true; }}>Delete show</button>
     </div>
   {/if}

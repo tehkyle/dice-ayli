@@ -1,6 +1,8 @@
 <script>
   import { onMount, onDestroy, tick } from 'svelte';
   import { api } from '../lib/api.js';
+  import { getSocket } from '../lib/socket.js';
+  import PhotoThumbGrid from '../components/PhotoThumbGrid.svelte';
 
   const POLL_MS = 5000;
 
@@ -80,6 +82,30 @@
   function onZoomSlider(t) {
     zoomT = t;
     applyZoom(tToZoom(t));
+  }
+
+  let galleryOpen    = $state(false);
+  let galleryPhotos  = $state([]);
+
+  async function loadGalleryPhotos() {
+    if (!showId) return;
+    try {
+      const { photos } = await api.getPhotos(showId);
+      galleryPhotos = photos;
+    } catch {}
+  }
+
+  function openGallery() {
+    galleryOpen = true;
+    loadGalleryPhotos();
+  }
+
+  function closeGallery() {
+    galleryOpen = false;
+  }
+
+  function handleGalleryDelete(filename) {
+    galleryPhotos = galleryPhotos.filter(p => p.filename !== filename);
   }
 
   let pinchStartDist = null;
@@ -250,6 +276,11 @@
     document.addEventListener('fullscreenchange', onFullscreenChange);
     document.addEventListener('webkitfullscreenchange', onFullscreenChange);
 
+    const socket = getSocket();
+    socket.on('photos_changed', ({ show_id }) => {
+      if (show_id === showId && galleryOpen) loadGalleryPhotos();
+    });
+
     checkStatus();
     pollTimer = setInterval(checkStatus, POLL_MS);
   });
@@ -260,6 +291,7 @@
     stopCamera();
     document.removeEventListener('fullscreenchange', onFullscreenChange);
     document.removeEventListener('webkitfullscreenchange', onFullscreenChange);
+    getSocket().off('photos_changed');
   });
 </script>
 
@@ -267,6 +299,18 @@
   <button class="camera-fullscreen" aria-label="Toggle fullscreen" onclick={toggleFullscreen}>
     {isFullscreen ? '⤡' : '⤢'}
   </button>
+{/if}
+
+{#if galleryOpen}
+  <div class="camera-gallery-overlay">
+    <div class="camera-gallery-header">
+      <h2 class="camera-gallery-title">Show Photos</h2>
+      <button class="camera-gallery-close" onclick={closeGallery}>Close</button>
+    </div>
+    <div class="camera-gallery-body">
+      <PhotoThumbGrid photos={galleryPhotos} showId={showId} mode="delete" ondelete={handleGalleryDelete} />
+    </div>
+  </div>
 {/if}
 
 {#if phase === 'active'}
@@ -279,7 +323,10 @@
     <video bind:this={videoEl} class="camera-video" autoplay playsinline muted></video>
     <canvas bind:this={canvasEl} class="camera-canvas-hidden"></canvas>
 
-    <div class="camera-count">{sessionCount} photo{sessionCount === 1 ? '' : 's'} taken</div>
+    <div class="camera-top-right">
+      <div class="camera-count">{sessionCount} photo{sessionCount === 1 ? '' : 's'} taken</div>
+      <button class="camera-view-photos" onclick={openGallery}>View Photos</button>
+    </div>
 
     <button class="camera-flip" aria-label="Flip camera" onclick={flipCamera}>⟲</button>
 

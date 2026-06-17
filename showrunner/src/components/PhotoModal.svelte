@@ -5,13 +5,28 @@
   import { showData } from '../stores/show.svelte.js';
   import { getSocket } from '../lib/socket.js';
   import { api } from '../lib/api.js';
+  import PhotoThumbGrid from './PhotoThumbGrid.svelte';
 
-  let cameraUrl      = $state('');
+  let tab             = $state('controls'); // 'controls' | 'gallery'
+  let cameraUrl       = $state('');
   let canvasEl        = $state(null);
   let opening         = $state(false);
-  let closing          = $state(false);
+  let closing         = $state(false);
   let photosReceived  = $state(null);
   let error           = $state('');
+  let galleryPhotos   = $state([]);
+
+  async function loadGallery() {
+    if (!showData.id) return;
+    try {
+      const { photos } = await api.getPhotos(showData.id);
+      galleryPhotos = photos;
+    } catch {}
+  }
+
+  function handlePhotoDeleted(filename) {
+    galleryPhotos = galleryPhotos.filter(p => p.filename !== filename);
+  }
 
   async function renderQr() {
     if (!canvasEl || !cameraUrl) return;
@@ -31,6 +46,7 @@
     } catch {}
     await tick();
     renderQr();
+    loadGallery();
   }
 
   async function openWindow() {
@@ -72,14 +88,23 @@
     if (e.key === 'Escape') closePhotoModal();
   }
 
+  // The QR canvas lives inside the "controls" tab's markup, so it's a fresh DOM
+  // node (and canvasEl rebinds) every time we switch back to this tab — redraw
+  // onto it rather than relying on the one-time renderQr() calls in loadStatus/openWindow.
+  $effect(() => {
+    if (tab === 'controls' && canvasEl && cameraUrl) renderQr();
+  });
+
   $effect(() => {
     if (!photoModalState.open) return;
     loadStatus();
     const socket = getSocket();
-    socket.on('photo_uploaded', ({ show_id, count }) => {
-      if (show_id === showData.id) photoWindowState.count = count;
+    socket.on('photos_changed', ({ show_id, count }) => {
+      if (show_id !== showData.id) return;
+      photoWindowState.count = count;
+      loadGallery();
     });
-    return () => socket.off('photo_uploaded');
+    return () => socket.off('photos_changed');
   });
 </script>
 
@@ -100,9 +125,18 @@
         <button class="modal-close" onclick={closePhotoModal} aria-label="Close">✕</button>
       </div>
 
+      {#if showData.id}
+        <div class="modal-tabs">
+          <button class="modal-tab {tab === 'controls' ? 'active' : ''}" onclick={() => tab = 'controls'}>Controls</button>
+          <button class="modal-tab {tab === 'gallery' ? 'active' : ''}" onclick={() => tab = 'gallery'}>Gallery</button>
+        </div>
+      {/if}
+
       <div class="modal-body">
         {#if !showData.id}
           <p class="modal-desc">Start a show to enable photo uploads.</p>
+        {:else if tab === 'gallery'}
+          <PhotoThumbGrid photos={galleryPhotos} showId={showData.id} mode="delete" ondelete={handlePhotoDeleted} />
         {:else}
           {#if cameraUrl}
             <canvas bind:this={canvasEl} class="photo-qr"></canvas>
@@ -126,7 +160,7 @@
         {/if}
       </div>
 
-      {#if showData.id}
+      {#if showData.id && tab === 'controls'}
         <div class="modal-footer">
           {#if !photoWindowState.open}
             <button class="btn btn-primary" disabled={opening} onclick={openWindow}>

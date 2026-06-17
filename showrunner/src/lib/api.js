@@ -37,4 +37,5 @@ export const api = {
   closePhotoWindow:     (id) => json('POST', `/api/shows/${id}/photo-window/close`),
   getPhotoWindowStatus: (id) => json('GET',  `/api/shows/${id}/photo-window/status`),
   getPhotos:            (id) => json('GET',  `/api/photos/${id}`),
+  deletePhoto:          (id, filename) => json('DELETE', `/api/photos/${id}/${encodeURIComponent(filename)}`),
 };

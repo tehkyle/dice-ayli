@@ -4,6 +4,7 @@ const path    = require('path');
 const fs      = require('fs');
 const crypto  = require('crypto');
 const multer  = require('multer');
+const archiver = require('archiver');
 
 const { getDb, nextId } = require('../db/database');
 const { broadcast } = require('./events');
@@ -48,8 +49,50 @@ router.post('/upload', upload.single('photo'), (req, res) => {
   db.data.photos.push({ id: nextId(db.data.photos), show_id: showId, filename, uploaded_at });
   db.write();
 
-  broadcast('photo_uploaded', { show_id: showId, count: db.data.photos.filter(p => p.show_id === showId).length });
+  broadcast('photos_changed', { show_id: showId, count: db.data.photos.filter(p => p.show_id === showId).length });
   res.json({ success: true, filename });
+});
+
+// DELETE /api/photos/:show_id/:filename — remove one photo (file + record)
+router.delete('/:show_id/:filename', (req, res) => {
+  const db       = getDb();
+  const showId   = parseInt(req.params.show_id, 10);
+  const filename = req.params.filename;
+
+  const idx = db.data.photos.findIndex(p => p.show_id === showId && p.filename === filename);
+  if (idx === -1) return res.status(404).json({ error: 'Photo not found' });
+
+  try {
+    fs.unlinkSync(path.join(PHOTOS_DIR, String(showId), filename));
+  } catch {}
+
+  db.data.photos.splice(idx, 1);
+  db.write();
+
+  const count = db.data.photos.filter(p => p.show_id === showId).length;
+  broadcast('photos_changed', { show_id: showId, count });
+  res.json({ success: true, count });
+});
+
+// GET /api/photos/:show_id/zip — download every photo for a show as a single zip
+router.get('/:show_id/zip', (req, res) => {
+  const db     = getDb();
+  const showId = parseInt(req.params.show_id, 10);
+  const { photos } = photosForShow(db, showId);
+  if (photos.length === 0) return res.status(404).json({ error: 'No photos for this show' });
+
+  res.set({
+    'Content-Type': 'application/zip',
+    'Content-Disposition': `attachment; filename="show-${showId}-photos.zip"`,
+  });
+
+  const archive = archiver('zip');
+  archive.on('error', err => res.status(500).end(err.message));
+  archive.pipe(res);
+  for (const { filename } of photos) {
+    archive.file(path.join(PHOTOS_DIR, String(showId), filename), { name: filename });
+  }
+  archive.finalize();
 });
 
 // GET /api/photos/active — photos for the currently running performance, if any

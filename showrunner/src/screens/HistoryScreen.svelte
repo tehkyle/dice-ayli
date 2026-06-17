@@ -3,6 +3,7 @@
   import { formatDate } from '../lib/format.js';
   import { api } from '../lib/api.js';
   import HistoryCard from '../components/HistoryCard.svelte';
+  import HistoryGalleryModal from '../components/HistoryGalleryModal.svelte';
 
   let shows = $state([]);
   let tracks = $state([]);
@@ -97,3 +98,5 @@
     {/if}
   </div>
 </div>
+
+<HistoryGalleryModal />
