@@ -1,5 +1,6 @@
 const json = (method, path, body) => fetch(path, {
   method,
+  cache: 'no-store',
   ...(body !== undefined ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}),
 }).then(r => r.json());
 
@@ -7,6 +8,7 @@ export const api = {
   getConfig:        ()          => json('GET',    '/api/config'),
   getShows:         ()          => json('GET',    '/api/shows'),
   getActiveShow:    ()          => json('GET',    '/api/shows/active'),
+  getLatestShow:    ()          => json('GET',    '/api/shows/latest'),
   createShow:       ()          => json('POST',   '/api/shows', {}),
   deleteShow:       (id)        => fetch(`/api/shows/${id}`, { method: 'DELETE' }),
   clearAllShows:    ()          => fetch('/api/shows', { method: 'DELETE' }),
@@ -30,4 +32,10 @@ export const api = {
   saveQlabConfig:   (body)      => json('POST',   '/api/config/qlab', body),
   listSheets:       ()          => json('GET',    '/api/sheets/list'),
   getSheetTabs:     (id)        => json('GET',    `/api/sheets/${id}/tabs`),
+
+  openPhotoWindow:      (id) => json('POST', `/api/shows/${id}/photo-window/open`),
+  closePhotoWindow:     (id) => json('POST', `/api/shows/${id}/photo-window/close`),
+  getPhotoWindowStatus: (id) => json('GET',  `/api/shows/${id}/photo-window/status`),
+  getPhotos:            (id) => json('GET',  `/api/photos/${id}`),
+  deletePhoto:          (id, filename) => json('DELETE', `/api/photos/${id}/${encodeURIComponent(filename)}`),
 };

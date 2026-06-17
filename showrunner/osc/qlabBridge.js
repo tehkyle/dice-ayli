@@ -254,6 +254,27 @@ async function sendCastToQLab(castMap) {
   return allOk;
 }
 
+// Writes the show's photo folder's absolute path into a memo cue's notes, so a
+// QLab-side AppleScript (e.g. a Script cue at the finale) can read it to know
+// where to find that performance's uploaded photos. No-op if photosPathCue isn't
+// configured — this is opt-in per-production, not every workspace has the cue.
+async function sendPhotosPathToQLab(showId) {
+  const { photosPathCue } = loadConfig();
+  if (!photosPathCue) return true;
+
+  await ensureConnected();
+  const photosPath = path.join(__dirname, '../photos', String(showId));
+  const addr = cueAddress(photosPathCue, 'notes');
+  logOut(`${addr} "${photosPath}"`);
+  try {
+    oscClient.send(addr, photosPath);
+    return true;
+  } catch (err) {
+    logErr(`Failed to send ${addr}: ${err.message}`);
+    return false;
+  }
+}
+
 // Sends act scene selections to QLab by writing comma-separated scene IDs into
 // the notes of the act memo cues. Prefix "ORDERED:" signals the QLab randomiser
 // to pop from the front instead of shuffling.
@@ -371,6 +392,8 @@ function endShow(showId) {
     const show = _db.data.shows.find(s => s.id === showId);
     if (!show) return;
     show.ended_at = new Date().toISOString();
+    show.photo_window_open      = false;
+    show.photo_window_closed_at = show.ended_at;
     _db.write();
 
     const allSorted        = [..._db.data.shows].sort((a, b) => a.id - b.id);
@@ -506,6 +529,7 @@ module.exports = {
   getPlayhead,
   sendCastToQLab,
   sendScenesToQLab,
+  sendPhotosPathToQLab,
   sendGo,
   sendPanicAll,
   reconnectQLab,

@@ -1,8 +1,8 @@
 const express = require('express');
 const router  = express.Router();
 const { getDb, nextId } = require('../db/database');
-const { sendCastToQLab, sendScenesToQLab, setActiveShow, endShow } = require('../osc/qlabBridge');
-const { formatShow } = require('../utils');
+const { sendCastToQLab, sendScenesToQLab, sendPhotosPathToQLab, setActiveShow, endShow } = require('../osc/qlabBridge');
+const { formatShow, getCameraUrl } = require('../utils');
 
 function localDateString(d = new Date()) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -49,6 +49,13 @@ router.post('/:id/cast', async (req, res) => {
   show.scenes        = scenes || null;
   show.scenesOrdered = scenesOrdered || null;
   show.locked_at     = new Date().toISOString();
+
+  // Operators' phones need the upload window open as soon as the show is running,
+  // which is this moment — cast gets assigned minutes into the live show, not before it.
+  if (!show.photo_window_open) {
+    show.photo_window_open      = true;
+    show.photo_window_opened_at = show.locked_at;
+  }
   db.write();
 
   setActiveShow(showId);
@@ -60,12 +67,13 @@ router.post('/:id/cast', async (req, res) => {
     if (scenes && typeof scenes === 'object') {
       scenesOk = await sendScenesToQLab(scenes, scenesOrdered || {});
     }
-    qlabNotified = castOk && scenesOk;
+    const photosPathOk = await sendPhotosPathToQLab(showId);
+    qlabNotified = castOk && scenesOk && photosPathOk;
   } catch (err) {
     console.error(`[OSC ERR] sendCastToQLab threw: ${err.message}`);
   }
 
-  res.json({ success: true, qlabNotified });
+  res.json({ success: true, qlabNotified, camera_url: getCameraUrl(showId) });
 });
 
 // POST /api/shows/:id/end — force-end a show and trigger the Sheets report
@@ -83,6 +91,8 @@ router.post('/:id/cancel', (req, res) => {
   if (!show) return res.status(404).json({ error: 'Show not found' });
   if (!show.ended_at) {
     show.ended_at = new Date().toISOString();
+    show.photo_window_open      = false;
+    show.photo_window_closed_at = show.ended_at;
     db.write();
   }
   setActiveShow(null);
@@ -126,6 +136,61 @@ router.get('/active', (req, res) => {
   const active = [...sorted].reverse().find(s => s.locked_at && !s.ended_at);
   if (!active) return res.json(null);
   res.json(formatShow(active, sorted, db));
+});
+
+// POST /api/shows/:id/photo-window/open — let operator phones start uploading
+router.post('/:id/photo-window/open', (req, res) => {
+  const db     = getDb();
+  const showId = parseInt(req.params.id, 10);
+  const show   = db.data.shows.find(s => s.id === showId);
+  if (!show) return res.status(404).json({ error: 'Show not found' });
+
+  show.photo_window_open      = true;
+  show.photo_window_opened_at = new Date().toISOString();
+  show.photo_window_closed_at = null;
+  db.write();
+
+  res.json({
+    success:        true,
+    show_id:        showId,
+    window_open_at: show.photo_window_opened_at,
+    camera_url:     getCameraUrl(showId),
+  });
+});
+
+// POST /api/shows/:id/photo-window/close — stop accepting uploads
+router.post('/:id/photo-window/close', (req, res) => {
+  const db     = getDb();
+  const showId = parseInt(req.params.id, 10);
+  const show   = db.data.shows.find(s => s.id === showId);
+  if (!show) return res.status(404).json({ error: 'Show not found' });
+
+  show.photo_window_open      = false;
+  show.photo_window_closed_at = new Date().toISOString();
+  db.write();
+
+  res.json({ success: true, photos_received: db.data.photos.filter(p => p.show_id === showId).length });
+});
+
+// GET /api/shows/:id/photo-window/status — polled by the operator camera page,
+// and used by the SM panel to redisplay the QR after reopening its modal.
+router.get('/:id/photo-window/status', (req, res) => {
+  const db     = getDb();
+  const showId = parseInt(req.params.id, 10);
+  const show   = db.data.shows.find(s => s.id === showId);
+  if (!show) return res.json({ open: false });
+
+  res.json({ open: !!show.photo_window_open, show_id: showId, camera_url: getCameraUrl(showId) });
+});
+
+// GET /api/shows/latest — most recent show that hasn't ended yet (locked or not).
+// Used by the camera page when opened from a saved home-screen icon rather than a
+// freshly-scanned per-show QR code, so a reused icon resolves to whatever show is
+// current instead of a stale one baked into a URL.
+router.get('/latest', (req, res) => {
+  const db     = getDb();
+  const latest = [...db.data.shows].sort((a, b) => b.id - a.id).find(s => !s.ended_at);
+  res.json(latest ? { id: latest.id } : null);
 });
 
 // GET /api/shows/today — today's shows only

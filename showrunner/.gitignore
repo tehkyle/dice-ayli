@@ -3,6 +3,7 @@ node_modules/
 db/showrunner.json
 sheets-config.json
 dist/
+photos/
 
 # Vite build output — source of truth is src/
 public/assets/

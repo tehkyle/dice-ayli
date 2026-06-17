@@ -16,14 +16,22 @@
   import ConfirmScreen from './screens/ConfirmScreen.svelte';
   import ProgressScreen from './screens/ProgressScreen.svelte';
   import SummaryScreen from './screens/SummaryScreen.svelte';
+  import CameraScreen from './screens/CameraScreen.svelte';
   import SettingsModal from './components/SettingsModal.svelte';
   import SettingsBadge from './components/SettingsBadge.svelte';
+  import PhotoModal from './components/PhotoModal.svelte';
+  import PhotoBadge from './components/PhotoBadge.svelte';
 
   let appVersion = $state('');
 
   onMount(async () => {
     if (window.location.pathname.startsWith('/history')) {
       nav.screen = 'history';
+      return;
+    }
+
+    if (window.location.pathname.startsWith('/camera')) {
+      nav.screen = 'camera';
       return;
     }
 
@@ -69,7 +77,9 @@
   });
 </script>
 
-{#if nav.screen === 'history'}
+{#if nav.screen === 'camera'}
+  <CameraScreen />
+{:else if nav.screen === 'history'}
   <HistoryScreen />
 {:else if nav.screen === 'welcome'}
   <WelcomeScreen />
@@ -89,8 +99,16 @@
   </div>
 {/if}
 
-<div class="global-settings-badge"><SettingsBadge /></div>
-<SettingsModal />
+{#if nav.screen !== 'camera'}
+  <div class="global-badges">
+    {#if showData.id}
+      <PhotoBadge />
+    {/if}
+    <SettingsBadge />
+  </div>
+  <PhotoModal />
+  <SettingsModal />
+{/if}
 
 {#if appVersion}
   <div class="app-version">v{appVersion}</div>

@@ -929,11 +929,13 @@ body.history-page {
 
 /* Settings button */
 
-.global-settings-badge {
+.global-badges {
   position: fixed;
   top: 16px;
   right: 16px;
   z-index: 60;
+  display: flex;
+  gap: 12px;
 }
 
 .btn-settings {
@@ -1590,4 +1592,319 @@ body.history-page {
   pointer-events: none;
   user-select: none;
   letter-spacing: 0.03em;
+}
+
+/* Photo upload window — SM modal */
+
+.photo-modal {
+  height: auto;
+}
+
+.photo-modal .modal-body {
+  gap: 12px;
+  padding: 20px 24px;
+}
+
+.photo-qr {
+  align-self: center;
+  background: #fff;
+  padding: 10px;
+  border-radius: 8px;
+}
+
+.photo-qr-url {
+  text-align: center;
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  word-break: break-all;
+}
+
+.photo-folder-path {
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.photo-status {
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: 0.02em;
+}
+
+.photo-status.success {
+  background: var(--success-bg);
+  border: 2px solid var(--success);
+  color: var(--success);
+}
+
+.photo-status.warn {
+  background: var(--warn-bg);
+  border: 2px solid var(--warn);
+  color: var(--warn);
+}
+
+/* Operator camera page */
+
+.camera-message {
+  align-items: center;
+  text-align: center;
+}
+
+.camera-pulse {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.camera-active {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+}
+
+.camera-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.camera-canvas-hidden {
+  display: none;
+}
+
+.camera-shutter {
+  position: absolute;
+  bottom: 36px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background: #fff;
+  border: 6px solid rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+}
+
+.camera-shutter:active {
+  background: var(--accent);
+}
+
+.camera-top-right {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.camera-count {
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 0.8rem;
+  padding: 8px 14px;
+  border-radius: 20px;
+}
+
+.camera-fullscreen {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  z-index: 70;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  border: none;
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.camera-flip {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  border: none;
+  font-size: 1.3rem;
+  cursor: pointer;
+}
+
+.camera-zoom-row {
+  position: absolute;
+  bottom: 130px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.camera-zoom {
+  flex: 1;
+  accent-color: var(--accent);
+}
+
+.camera-zoom-value {
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  background: rgba(0, 0, 0, 0.55);
+  padding: 4px 8px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.camera-thumb-flash {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 2px solid #fff;
+}
+
+.camera-upload-error {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--danger-bg);
+  border: 2px solid var(--danger);
+  color: var(--danger);
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-weight: 700;
+}
+
+/* Photo thumbnail grid — shared by SM gallery tab, camera "View Photos", history gallery */
+
+.photo-thumb-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 12px;
+}
+
+.photo-thumb-tile {
+  position: relative;
+  aspect-ratio: 1;
+}
+
+.photo-thumb-img,
+.photo-thumb-link {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.photo-thumb-img {
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.photo-thumb-delete {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  border: none;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.photo-thumb-confirm {
+  position: absolute;
+  inset: 0;
+  background: var(--danger-bg);
+  border: 2px solid var(--danger);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px;
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--danger);
+}
+
+.photo-thumb-empty {
+  grid-column: 1 / -1;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  text-align: center;
+  padding: 24px 0;
+}
+
+/* Camera page: "View Photos" trigger + full-screen gallery overlay */
+
+.camera-view-photos {
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  border: none;
+  font-size: 0.8rem;
+  padding: 8px 14px;
+  border-radius: 20px;
+  cursor: pointer;
+}
+
+.camera-gallery-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+}
+
+.camera-gallery-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.camera-gallery-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.camera-gallery-close {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 16px;
+  cursor: pointer;
+}
+
+.camera-gallery-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
 }

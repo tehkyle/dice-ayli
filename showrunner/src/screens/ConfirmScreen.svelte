@@ -5,6 +5,7 @@
   import { castData } from '../stores/cast.svelte.js';
   import { buildScenePayload } from '../stores/scenes.svelte.js';
   import { resetProgress } from '../stores/progress.svelte.js';
+  import { photoWindowState } from '../stores/photoModal.svelte.js';
   import { api } from '../lib/api.js';
   import CastSummaryRow from '../components/CastSummaryRow.svelte';
 
@@ -23,6 +24,7 @@
       });
       showData.lockTime = new Date();
       showData.qlabNotified = lockData.qlabNotified ?? false;
+      photoWindowState.open = true;
       resetProgress();
       nav.screen = 'progress';
     } catch {

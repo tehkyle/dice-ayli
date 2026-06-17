@@ -1,4 +1,9 @@
+const os   = require('os');
+const fs   = require('fs');
+const path = require('path');
 const { google } = require('googleapis');
+
+const CONFIG_PATH = path.join(__dirname, 'config.json');
 
 function createOAuth2Client(redirectUri) {
   return new google.auth.OAuth2(
@@ -28,6 +33,7 @@ function formatShow(show, allShows, db) {
     scenes_played: db.data.scene_log
       .filter(e => e.show_id === show.id)
       .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)),
+    photo_count: db.data.photos.filter(p => p.show_id === show.id).length,
   };
 }
 
@@ -39,4 +45,25 @@ function extractWorkspaceId(body) {
   return null;
 }
 
-module.exports = { buildOAuthClient, createOAuth2Client, formatShow, extractWorkspaceId };
+// Finds this machine's LAN-reachable IPv4 address so phones on the same WiFi can hit it.
+// Falls back to localhost if no external interface is found (e.g. offline dev).
+function getLanIp() {
+  const interfaces = Object.values(os.networkInterfaces()).flat();
+  const lan = interfaces.find(i => i.family === 'IPv4' && !i.internal);
+  return lan ? lan.address : 'localhost';
+}
+
+// Builds the operator camera URL. getUserMedia requires https, so this is always
+// https — either a real domain (config.cameraHostname, set up with a trusted cert
+// and router DNS override for production) or the auto-detected LAN IP (self-signed
+// cert, browser shows a one-time warning) as a fallback for ad-hoc networks.
+function getCameraUrl(showId, httpsPort) {
+  let config = {};
+  try { config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8')); } catch {}
+
+  const host = config.cameraHostname || getLanIp();
+  const port = httpsPort || config.cameraHttpsPort || 8443;
+  return `https://${host}:${port}/camera?show=${showId}`;
+}
+
+module.exports = { buildOAuthClient, createOAuth2Client, formatShow, extractWorkspaceId, getLanIp, getCameraUrl };
