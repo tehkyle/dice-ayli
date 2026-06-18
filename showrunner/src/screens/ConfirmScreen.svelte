@@ -40,9 +40,17 @@
 
   <div class="cast-summary">
     {#each configData.characterTracks as track (track.id)}
-      {@const actorName = castData.selections[track.id] ?? ''}
-      {@const actor = configData.actors.find(a => a.name === actorName) ?? null}
-      <CastSummaryRow {track} {actorName} {actor} />
+      {#if track.id !== 'Track_Singer'}
+        {@const actorName = castData.selections[track.id] ?? ''}
+        {@const actor = configData.actors.find(a => a.name === actorName) ?? null}
+        {@const singerName = castData.selections['Track_Singer'] ?? ''}
+        <CastSummaryRow
+          {track}
+          {actorName}
+          {actor}
+          isFeaturedSinger={!!singerName && singerName === actorName}
+        />
+      {/if}
     {/each}
   </div>
 

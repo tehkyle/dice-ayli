@@ -88,6 +88,16 @@
       "id": "Track_6",
       "label": "Track 6",
       "subtitle": "Phebe / Jaques / Charles"
+    },
+    {
+      "id": "Track_DJ",
+      "label": "DJ",
+      "subtitle": ""
+    },
+    {
+      "id": "Track_Singer",
+      "label": "Featured Singer",
+      "subtitle": ""
     }
   ],
   "acts": [

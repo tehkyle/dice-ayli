@@ -33,9 +33,20 @@ router.post('/:id/cast', async (req, res) => {
     return res.status(400).json({ error: 'cast object required' });
   }
 
-  const actors = Object.values(cast);
-  if (new Set(actors).size !== actors.length) {
-    return res.status(400).json({ error: 'Duplicate actor assignments are not allowed' });
+  // DJ requires a unique actor; the Singer is a double role and may share with any
+  // other track except DJ. Any other repeated actor is a real duplicate.
+  const byActor = {};
+  for (const [track, actor] of Object.entries(cast)) {
+    (byActor[actor] ??= []).push(track);
+  }
+  for (const tracks of Object.values(byActor)) {
+    if (tracks.length < 2) continue;
+    const isAllowedPair = tracks.length === 2
+      && tracks.includes('Track_Singer')
+      && !tracks.includes('Track_DJ');
+    if (!isAllowedPair) {
+      return res.status(400).json({ error: 'Duplicate actor assignments are not allowed' });
+    }
   }
 
   const show = db.data.shows.find(s => s.id === showId);

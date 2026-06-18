@@ -334,7 +334,8 @@ html, body {
 
 .summary-row {
   display: flex;
-  align-items: baseline;
+  align-items: center;
+  justify-content: space-between;
   gap: 12px;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -378,6 +379,27 @@ html, body {
   border: 2px solid var(--border);
 }
 
+.summary-actor-img-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.singer-badge {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #f0c419;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+  border: 2px solid var(--surface);
+  box-shadow: 0 0 8px rgba(240, 196, 25, 0.8);
+}
+
 .summary-actor-sub {
   font-size: 0.85rem;
   font-weight: 400;
@@ -418,6 +440,12 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 24px;
+}
+
+.setup-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .act-section {
@@ -491,6 +519,36 @@ html, body {
   width: 15px;
   height: 15px;
   cursor: pointer;
+}
+
+.availability-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  padding: 16px 20px;
+}
+
+.availability-item {
+  justify-content: center;
+  padding: 10px 14px;
+  gap: 10px;
+}
+
+.availability-img {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+  transition: filter 0.15s, opacity 0.15s;
+}
+
+.availability-img.unavailable {
+  /* grayscale alone has no hue left to rotate — sepia first reintroduces a
+     uniform tint that hue-rotate can then push from brown into blue. */
+  filter: grayscale(1) sepia(1) hue-rotate(180deg) saturate(3);
+  opacity: 0.6;
 }
 
 /* Scene rig toggle button */
@@ -767,6 +825,11 @@ body.history-page {
   color: var(--accent);
 }
 
+.history-track-num.text {
+  font-size: 0.6rem;
+  letter-spacing: 0.02em;
+}
+
 .history-track-sub {
   flex: 1;
   min-width: 0;
@@ -794,6 +857,19 @@ body.history-page {
   object-fit: cover;
   border: 1px solid var(--border);
   flex-shrink: 0;
+}
+
+.history-actor-img-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.singer-badge-sm {
+  width: 18px;
+  height: 18px;
+  font-size: 0.65rem;
+  bottom: -2px;
+  right: -2px;
 }
 
 .history-actor-initial {

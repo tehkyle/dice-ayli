@@ -72,32 +72,43 @@
 
   <div class="history-cast-list">
     {#each tracks as track, i}
-      {@const actorName = castByTrack[track.id]}
-      {@const actor = actorName ? actorMap[actorName] : null}
-      <div class="history-cast-row">
-        <div class="history-track-label">
-          <span class="history-track-num">{i + 1}</span>
-          {#if track.subtitle}<span class="history-track-sub" title={track.subtitle}>{track.subtitle}</span>{/if}
-        </div>
-
-        {#if editMode}
-          <select class="history-edit-select" bind:value={editCast[track.id]}>
-            <option value="">— unassigned —</option>
-            {#each actors as a}
-              <option value={a.name}>{a.name}</option>
-            {/each}
-          </select>
-        {:else}
-          <div class="history-actor">
-            <div class="history-actor-name">{actorName || '—'}</div>
-            {#if actor?.image}
-              <img class="history-actor-img" src={actorImageUrl(actor.image)} alt={actorName} />
-            {:else if actorName}
-              <div class="history-actor-initial">{actorName[0].toUpperCase()}</div>
-            {/if}
+      {#if editMode || track.id !== 'Track_Singer'}
+        {@const actorName = castByTrack[track.id]}
+        {@const actor = actorName ? actorMap[actorName] : null}
+        {@const singerName = castByTrack['Track_Singer']}
+        {@const isFeaturedSinger = !!singerName && singerName === actorName}
+        <div class="history-cast-row">
+          <div class="history-track-label">
+            <span class="history-track-num {track.id === 'Track_DJ' ? 'text' : ''}">
+              {track.id === 'Track_DJ' ? 'DJ' : i + 1}
+            </span>
+            {#if track.subtitle}<span class="history-track-sub" title={track.subtitle}>{track.subtitle}</span>{/if}
           </div>
-        {/if}
-      </div>
+
+          {#if editMode}
+            <select class="history-edit-select" bind:value={editCast[track.id]}>
+              <option value="">— unassigned —</option>
+              {#each actors as a}
+                <option value={a.name}>{a.name}</option>
+              {/each}
+            </select>
+          {:else}
+            <div class="history-actor">
+              <div class="history-actor-name">{actorName || '—'}</div>
+              <div class="history-actor-img-wrap">
+                {#if actor?.image}
+                  <img class="history-actor-img" src={actorImageUrl(actor.image)} alt={actorName} />
+                {:else if actorName}
+                  <div class="history-actor-initial">{actorName[0].toUpperCase()}</div>
+                {/if}
+                {#if isFeaturedSinger}
+                  <span class="singer-badge singer-badge-sm" title="Featured Singer">🎤</span>
+                {/if}
+              </div>
+            </div>
+          {/if}
+        </div>
+      {/if}
     {/each}
   </div>
 

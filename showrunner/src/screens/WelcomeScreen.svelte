@@ -7,6 +7,7 @@
   import { loadConfig } from '../stores/config.svelte.js';
   import { initScenesFromActs } from '../stores/scenes.svelte.js';
   import { initCastFromTracks } from '../stores/cast.svelte.js';
+  import { initAvailability } from '../stores/availability.svelte.js';
   import QlabStatus from '../components/QlabStatus.svelte';
 
   const today = toIsoDate();
@@ -64,6 +65,7 @@
       const { characterTracks, acts } = await import('../stores/config.svelte.js').then(m => m.configData);
       initScenesFromActs(acts);
       initCastFromTracks(characterTracks);
+      initAvailability();
 
       nav.screen = 'scenes';
     } catch {
