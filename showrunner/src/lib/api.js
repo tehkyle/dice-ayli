@@ -20,7 +20,7 @@ export const api = {
   getQlabStatus:    ()          => json('GET',    '/api/qlab/status'),
   getPlayhead:      ()          => json('GET',    '/api/qlab/playhead'),
   postGo:           ()          => json('POST',   '/api/qlab/go'),
-  panicAll:         ()          => fetch('/api/qlab/panic', { method: 'POST' }),
+  panicAll:         ()          => json('POST',   '/api/qlab/panic'),
   reconnectQLab:    (body)      => json('POST',   '/api/qlab/reconnect', body ?? {}),
 
   getVersion:       ()          => json('GET',    '/api/version'),

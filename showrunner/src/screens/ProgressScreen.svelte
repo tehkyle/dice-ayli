@@ -21,6 +21,7 @@
   let reconnectResult = $state(null); // null | 'ok' | 'failed'
   let reconnectTimer = null;
   let panicking = $state(false);
+  let panicError = $state('');
   let panicTimer = null;
 
   let nextCueDisplay = $derived(formatCueDisplay(progressData.nextCueNumber, progressData.nextCueName));
@@ -89,8 +90,14 @@
 
   async function panic() {
     panicking = true;
+    panicError = '';
     clearTimeout(panicTimer);
-    try { await api.panicAll(); } catch {}
+    try {
+      const res = await api.panicAll();
+      if (res?.error) panicError = 'PANIC failed — QLab is not responding. Try again.';
+    } catch {
+      panicError = 'PANIC failed — could not reach the server.';
+    }
     panicTimer = setTimeout(() => { panicking = false; }, 1000);
   }
 
@@ -168,6 +175,9 @@
     </button>
   </div>
 
+  {#if panicError}
+    <div class="go-error">{panicError}</div>
+  {/if}
   <button class="btn-panic {panicking ? 'active' : ''}" onclick={panic}>
     {panicking ? 'PANIC' : 'Panic All'}
   </button>

@@ -23,6 +23,11 @@ const WORKSPACE_DISCOVER_MS = 2000;
 const CONNECT_TIMEOUT_MS    = 2000;
 const HEALTH_CHECK_MS       = 3000;
 const PLAYHEAD_QUERY_MS     = 500;
+// Success is silent (confirmed live) — every go/panic pays this wait in full, so
+// keep it tight. Denied/error replies on loopback arrive in single-digit ms;
+// 200ms leaves a large margin without making a successful go feel laggy.
+const GO_REPLY_TIMEOUT_MS    = 200;
+const PANIC_REPLY_TIMEOUT_MS = 200;
 
 // ── QLab OSC address builders ──────────────────────────────────────────────────
 // These are the complete set of OSC paths this module writes to or reads from.
@@ -35,6 +40,9 @@ const OSC = {
   cueById:    (ws, id, prop)       => `/workspace/${ws}/cue_id/${id}/${prop}`,
   panic:      (ws)                 => ws ? `/workspace/${ws}/panic` : '/panic',
   playhead:   (ws, cue)            => `/workspace/${ws}/playhead/${cue}`,
+  // GET form (no args) returns the cue NUMBER currently at the playback position,
+  // e.g. {status:"ok", data:"1.2"} — confirmed against a live workspace.
+  playbackPosition: (ws)           => `/workspace/${ws}/playbackPosition`,
 };
 
 // ── Internal state ─────────────────────────────────────────────────────────────
@@ -151,6 +159,7 @@ async function connectQLab() {
     connected = true;
     log('Connected to QLab workspace');
     subscribeToUpdates();
+    queryPlayhead().catch(() => {}); // best-effort — don't delay connectQLab's return
   } else {
     logErr(`Connect failed: ${status}`);
   }
@@ -199,6 +208,33 @@ async function updatePlayhead(cueId) {
 
 function getPlayhead() {
   return currentPlayhead;
+}
+
+// Pulls QLab's current playback position directly, rather than waiting for the
+// next reactive /playbackPosition push — that push only fires on change, so if
+// the playhead hasn't moved since we subscribed (e.g. right after connecting),
+// nothing would otherwise populate currentPlayhead until the next go.
+async function queryPlayhead() {
+  const ws = workspaceQualifier();
+  if (!ws) return;
+
+  const numberPromise = waitForOscReply(
+    (addr, body) => addr.includes('/playbackPosition') ? (body?.data ?? '') : undefined,
+    PLAYHEAD_QUERY_MS
+  );
+  oscClient.send(OSC.playbackPosition(ws));
+  const cueNumber = (await numberPromise) ?? '';
+  if (!cueNumber || cueNumber === '-') return;
+
+  const namePromise = waitForOscReply(
+    (addr, body) => addr.includes(`/cue/${cueNumber}/name`) ? (body?.data ?? '') : undefined,
+    PLAYHEAD_QUERY_MS
+  );
+  oscClient.send(cueAddress(cueNumber, 'name'));
+  const cueName = (await namePromise) ?? '';
+
+  currentPlayhead = { cueNumber, cueName };
+  lastKnownCueNumber = cueNumber;
 }
 
 function restorePlayhead(cueNumber) {
@@ -303,16 +339,51 @@ async function sendGo() {
   const { qlabMainCueList } = loadConfig();
   const ws   = workspaceQualifier();
   const addr = OSC.cue(ws, qlabMainCueList, 'go');
+
+  // Confirmed live against QLab: a successful go gets NO reply at all (only the
+  // resulting playbackPosition/scene_started pushes) — QLab only replies here to
+  // report a problem ('denied' for a stale/unauthenticated session, 'error' for a
+  // bad cue target). So a reply within the short window means failure; silence
+  // means success. Replies that do come arrive in single-digit ms on loopback,
+  // well under this timeout.
+  const failurePromise = waitForOscReply(
+    (address, body) => address.includes(`/cue/${qlabMainCueList}/go`) ? (body?.status ?? 'unknown') : undefined,
+    GO_REPLY_TIMEOUT_MS
+  );
+
   logOut(addr);
   oscClient.send(addr);
+
+  const status = await failurePromise;
+  if (status && status !== 'ok') {
+    // Redundant if the receiver already caught this same denied/error reply below —
+    // harmless either way.
+    connected = false;
+    logErr(`Go failed: ${status}`);
+    throw new Error(`QLab rejected go: ${status}`);
+  }
 }
 
 async function sendPanicAll() {
   await ensureConnected();
   const addr = OSC.panic(workspaceQualifier());
+
+  // Same reply behavior as go, confirmed live: silence means success, a reply
+  // means QLab is reporting a problem. Panic is the emergency stop — it must not
+  // fail silently any more than go does.
+  const failurePromise = waitForOscReply(
+    (address, body) => address.includes('/panic') ? (body?.status ?? 'unknown') : undefined,
+    PANIC_REPLY_TIMEOUT_MS
+  );
+
   logOut(addr);
-  try { oscClient.send(addr); } catch (err) {
-    logErr(`sendPanicAll: ${err.message}`);
+  oscClient.send(addr);
+
+  const status = await failurePromise;
+  if (status && status !== 'ok') {
+    connected = false;
+    logErr(`Panic failed: ${status}`);
+    throw new Error(`QLab rejected panic: ${status}`);
   }
 }
 
@@ -444,6 +515,10 @@ function createReceiverServer(port) {
 
       try {
         const body = JSON.parse(args[0]);
+        // QLab also replies 'denied' for things like "no cue with that number" on
+        // /cue/{id}/* queries — not just a stale session. Forcing a reconnect here
+        // is harmless either way (idempotent), but don't read 'denied' as proof the
+        // session itself was the problem.
         if (body?.status === 'denied') {
           connected   = false;
           workspaceId = null;

@@ -36,9 +36,14 @@ router.post('/go', async (req, res) => {
 });
 
 // POST /api/qlab/panic
-router.post('/panic', (req, res) => {
-  sendPanicAll();
-  res.json({ sent: true });
+router.post('/panic', async (req, res) => {
+  try {
+    await sendPanicAll();
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[QLab] panic failed:', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // POST /api/qlab/reconnect
