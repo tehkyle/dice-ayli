@@ -5,6 +5,7 @@
   "main": "electron-main.js",
   "scripts": {
     "start": "node server.js",
+    "test": "node --test 'test/*.test.*'",
     "dev": "node --watch server.js & vite",
     "build": "vite build",
     "electron": "npm run build && electron .",
@@ -79,6 +80,7 @@
     "files": [
       "**/*",
       "!src/**",
+      "!test/**",
       "!dist/**",
       "!**/*.md",
       "!node_modules/.cache/**",
