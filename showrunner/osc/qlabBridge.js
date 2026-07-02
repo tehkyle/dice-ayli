@@ -42,9 +42,6 @@ const OSC = {
   cueById:    (ws, id, prop)       => `/workspace/${ws}/cue_id/${id}/${prop}`,
   panic:      (ws)                 => ws ? `/workspace/${ws}/panic` : '/panic',
   playhead:   (ws, cue)            => `/workspace/${ws}/playhead/${cue}`,
-  // GET form (no args) returns the cue NUMBER currently at the playback position,
-  // e.g. {status:"ok", data:"1.2"} — confirmed against a live workspace.
-  playbackPosition: (ws)           => `/workspace/${ws}/playbackPosition`,
 };
 
 // ── Internal state ─────────────────────────────────────────────────────────────
@@ -59,6 +56,7 @@ const initialNetwork = resolveNetwork();
 const oscClient = new Client(initialNetwork.host, initialNetwork.sendPort);
 
 let workspaceId        = null;
+let mainCueListId      = null;
 let connected          = false;
 let activeShowId       = null;
 let lastKnownCueNumber = null;
@@ -183,7 +181,9 @@ async function doConnect() {
     connected = true;
     log('Connected to QLab workspace');
     subscribeToUpdates();
-    queryPlayhead().catch(() => {});
+    resolveMainCueListId()
+      .then(() => queryPlayhead())
+      .catch(() => {});
     startPlayheadPoll();
   } else {
     logErr(`Connect failed: ${status}`);
@@ -244,31 +244,48 @@ function getPlayhead() {
   return currentPlayhead;
 }
 
-// Pulls QLab's current playback position directly, rather than waiting for the
-// next reactive /playbackPosition push — that push only fires on change, so if
-// the playhead hasn't moved since we subscribed (e.g. right after connecting),
-// nothing would otherwise populate currentPlayhead until the next go.
+// The workspace can hold several cue lists and QLab reports playhead activity
+// for all of them; the show only runs from the configured main list. Update
+// pushes are keyed by the list's unique ID, so resolve it once per connection
+// to let the receiver filter out the other lists.
+async function resolveMainCueListId() {
+  const { qlabMainCueList } = loadConfig();
+  if (!qlabMainCueList) return;
+
+  const idPromise = waitForOscReply(
+    (addr, body) => addr.includes(`/cue/${qlabMainCueList}/uniqueID`) ? (body?.data ?? null) : undefined,
+    PLAYHEAD_QUERY_MS
+  );
+  oscClient.send(cueAddress(qlabMainCueList, 'uniqueID'));
+  const id = await idPromise;
+  if (id) {
+    mainCueListId = id;
+    log(`Main cue list ID: ${id}`);
+  }
+}
+
+// Pulls the main cue list's playback position directly, rather than waiting for
+// the next reactive push — that push only fires on change, so if the playhead
+// hasn't moved since we subscribed (e.g. right after connecting), nothing would
+// otherwise populate currentPlayhead until the next go.
+// Deliberately NOT the workspace-level /playbackPosition address: that answers
+// for whichever cue list is currently active in QLab, so clicking around another
+// list would hijack the showrunner's playhead display.
 async function queryPlayhead() {
   const ws = workspaceQualifier();
   if (!ws) return;
+  const { qlabMainCueList } = loadConfig();
+  if (!qlabMainCueList) return;
 
-  const numberPromise = waitForOscReply(
-    (addr, body) => addr.includes('/playbackPosition') ? (body?.data ?? '') : undefined,
+  const idPromise = waitForOscReply(
+    (addr, body) => addr.includes(`/cue/${qlabMainCueList}/playbackPositionId`) ? (body?.data ?? '') : undefined,
     PLAYHEAD_QUERY_MS
   );
-  oscClient.send(OSC.playbackPosition(ws));
-  const cueNumber = (await numberPromise) ?? '';
-  if (!cueNumber || cueNumber === '-') return;
+  oscClient.send(cueAddress(qlabMainCueList, 'playbackPositionId'));
+  const cueId = await idPromise;
+  if (!cueId || cueId === 'none') return;
 
-  const namePromise = waitForOscReply(
-    (addr, body) => addr.includes(`/cue/${cueNumber}/name`) ? (body?.data ?? '') : undefined,
-    PLAYHEAD_QUERY_MS
-  );
-  oscClient.send(cueAddress(cueNumber, 'name'));
-  const cueName = (await namePromise) ?? '';
-
-  currentPlayhead = { cueNumber, cueName };
-  lastKnownCueNumber = cueNumber;
+  await updatePlayhead(cueId);
 }
 
 function restorePlayhead(cueNumber) {
@@ -283,8 +300,9 @@ function restorePlayhead(cueNumber) {
 }
 
 async function reconnectQLab(cueNumber) {
-  connected   = false;
-  workspaceId = null;
+  connected     = false;
+  workspaceId   = null;
+  mainCueListId = null;
   await discoverWorkspace();
   const status = await connectQLab();
   if (status === 'ok') {
@@ -622,8 +640,9 @@ function createReceiverServer(port) {
         // is harmless either way (idempotent), but don't read 'denied' as proof the
         // session itself was the problem.
         if (body?.status === 'denied') {
-          connected   = false;
-          workspaceId = null;
+          connected     = false;
+          workspaceId   = null;
+          mainCueListId = null;
           log('Session denied by QLab — will reconnect on next send');
           reconnectQLab().catch(() => {});
         } else if (body?.status === 'error' && address.includes('/cue/')) {
@@ -636,6 +655,11 @@ function createReceiverServer(port) {
     }
 
     if (address.includes('/playbackPosition')) {
+      // Pushes arrive per cue list (/update/.../cueList/{listId}/playbackPosition)
+      // — ignore every list except the configured main one. If either ID is
+      // still unknown, let the push through rather than showing no playhead.
+      const pushListId = address.match(/\/cueList\/([^/]+)\//)?.[1];
+      if (pushListId && mainCueListId && pushListId !== mainCueListId) return;
       const cueId = args[0];
       if (cueId) updatePlayhead(cueId);
       return;
@@ -689,6 +713,7 @@ function applyNetworkConfig() {
   oscClient.port = sendPort;
   connected      = false;
   workspaceId    = null;
+  mainCueListId  = null;
 
   if (receiverServer && receiverServer.port !== receivePort) {
     receiverServer.close();

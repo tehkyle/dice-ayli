@@ -35,8 +35,14 @@ fake.on('message', ([address, ...args]) => {
     send({ status: 'ok', data: 'ok:view|edit|control' });
   } else if (address === '/updates') {
     // no reply needed
-  } else if (address.includes('/playbackPosition')) {
-    send({ status: 'ok', data: '1' });
+  } else if (address.endsWith('/cue/MAIN/uniqueID')) {
+    send({ status: 'ok', data: 'LIST-MAIN-ID' });
+  } else if (address.endsWith('/cue/MAIN/playbackPositionId')) {
+    send({ status: 'ok', data: 'CUE-42' });
+  } else if ((m = address.match(/\/cue_id\/CUE-(\d+)\/number$/))) {
+    send({ status: 'ok', data: m[1] });
+  } else if (address.match(/\/cue_id\/[^/]+\/name$/)) {
+    send({ status: 'ok', data: 'Test Cue' });
   } else if ((m = address.match(/\/cue\/([^/]+)\/notes$/))) {
     const id = m[1];
     if (args.length > 0) { // set
@@ -86,6 +92,19 @@ fake.on('message', ([address, ...args]) => {
   assert.strictEqual(confirmFired, 1, 'confirm must not fire on failed verify');
   assert.strictEqual(notes.Track_2, 'Frank', 'healthy track still updated');
   console.log('ok 3 hard mismatch reported, confirm suppressed');
+
+  // 4. playhead is scoped to the main cue list
+  await new Promise(res => setTimeout(res, 300)); // let connect-time playhead query land
+  assert.deepStrictEqual(bridge.getPlayhead(), { cueNumber: '42', cueName: 'Test Cue' });
+  // a push from some other cue list must be ignored…
+  reply.send('/update/workspace/test/cueList/OTHER-LIST/playbackPosition', 'CUE-99');
+  await new Promise(res => setTimeout(res, 300));
+  assert.strictEqual(bridge.getPlayhead().cueNumber, '42', 'other-list push must not move playhead');
+  // …while a push from the main list updates it
+  reply.send('/update/workspace/test/cueList/LIST-MAIN-ID/playbackPosition', 'CUE-99');
+  await new Promise(res => setTimeout(res, 300));
+  assert.strictEqual(bridge.getPlayhead().cueNumber, '99', 'main-list push should move playhead');
+  console.log('ok 4 playhead scoped to main cue list');
 
   console.log('PASS');
   process.exit(0);
