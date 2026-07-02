@@ -2,6 +2,8 @@
   import { onMount, onDestroy, tick } from 'svelte';
   import { nav } from '../stores/screen.svelte.js';
   import { showData, resetShow } from '../stores/show.svelte.js';
+  import { castData } from '../stores/cast.svelte.js';
+  import { configData } from '../stores/config.svelte.js';
   import { progressData, appendScene, finalizeLastScene, resetProgress } from '../stores/progress.svelte.js';
   import { getSocket } from '../lib/socket.js';
   import { api } from '../lib/api.js';
@@ -47,6 +49,28 @@
     }
     await fetchPlayhead();
     setTimeout(() => { going = false; }, 800);
+  }
+
+  let resending = $state(false);
+
+  let castSyncWarning = $derived.by(() => {
+    if (showData.qlabNotified && showData.castMismatches.length === 0) return '';
+    if (showData.castMismatches.length === 0) return 'Cast not synced to QLab';
+    const names = showData.castMismatches.map(
+      id => configData.characterTracks.find(t => t.id === id)?.label ?? id
+    );
+    return `Cast not synced: ${names.join(', ')}`;
+  });
+
+  // Re-send + verify the locked cast; fires the CAST_CONFIRMED cue on success.
+  async function resendCast() {
+    resending = true;
+    try {
+      const result = await api.syncCast({ cast: castData.selections, confirm: true });
+      showData.castMismatches = result?.mismatches ?? showData.castMismatches;
+      if (result?.synced) showData.qlabNotified = true;
+    } catch {}
+    resending = false;
   }
 
   async function reconnect() {
@@ -148,10 +172,13 @@
   <div class="progress-meta">
     <span class="progress-perf">{showData.perfLabel}</span>
     <span class="progress-start">Started {startTime}</span>
-    {#if showData.qlabNotified}
-      <span class="progress-qlab-ok">✓ QLab notified</span>
+    {#if !castSyncWarning}
+      <span class="progress-qlab-ok">✓ Cast synced to QLab</span>
     {:else}
-      <span class="progress-qlab-warn">QLab notification failed</span>
+      <span class="progress-qlab-warn">{castSyncWarning}</span>
+      <button class="btn-qlab-reconnect" onclick={resendCast} disabled={resending}>
+        {resending ? 'Resending…' : 'Resend Cast'}
+      </button>
     {/if}
     <button
       class="btn-qlab-reconnect {reconnectResult === 'ok' ? 'ok' : reconnectResult === 'failed' ? 'failed' : ''}"

@@ -22,6 +22,7 @@ export const api = {
   postGo:           ()          => json('POST',   '/api/qlab/go'),
   panicAll:         ()          => json('POST',   '/api/qlab/panic'),
   reconnectQLab:    (body)      => json('POST',   '/api/qlab/reconnect', body ?? {}),
+  syncCast:         (body)      => json('POST',   '/api/qlab/sync-cast', body),
 
   getVersion:       ()          => json('GET',    '/api/version'),
 

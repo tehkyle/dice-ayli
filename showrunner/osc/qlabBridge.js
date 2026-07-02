@@ -23,11 +23,13 @@ const WORKSPACE_DISCOVER_MS = 2000;
 const CONNECT_TIMEOUT_MS    = 2000;
 const HEALTH_CHECK_MS       = 3000;
 const PLAYHEAD_QUERY_MS     = 500;
+const PLAYHEAD_POLL_MS      = 2000;
 // Success is silent (confirmed live) — every go/panic pays this wait in full, so
 // keep it tight. Denied/error replies on loopback arrive in single-digit ms;
 // 200ms leaves a large margin without making a successful go feel laggy.
 const GO_REPLY_TIMEOUT_MS    = 200;
 const PANIC_REPLY_TIMEOUT_MS = 200;
+const CAST_VERIFY_MS         = 1500;
 
 // ── QLab OSC address builders ──────────────────────────────────────────────────
 // These are the complete set of OSC paths this module writes to or reads from.
@@ -62,6 +64,7 @@ let activeShowId       = null;
 let lastKnownCueNumber = null;
 let currentPlayhead    = { cueNumber: '', cueName: '' };
 let receiverServer     = null;
+let playheadPollTimer  = null;
 
 let _db = null;
 let _broadcast = null;
@@ -136,30 +139,52 @@ async function discoverWorkspace() {
   return id ?? null;
 }
 
-async function connectQLab() {
+// All concurrent callers share one in-flight attempt — the receiver's denied
+// handler and a send's ensureConnected() can otherwise race two /connect
+// exchanges and cross-match each other's replies.
+let connectPromise = null;
+let lastConnectStatus = null;
+
+function connectQLab() {
+  return connectPromise ??= doConnect().finally(() => { connectPromise = null; });
+}
+
+async function doConnect() {
   if (connected) return 'ok';
 
   const { qlabPasscode } = loadConfig();
   const ws = workspaceQualifier() || await discoverWorkspace();
-  if (!ws) return 'no_workspace';
+  if (!ws) return (lastConnectStatus = 'no_workspace');
 
   const addr = OSC.connect(ws);
-  const statusPromise = waitForOscReply(
-    (address, body) => address.includes('/connect') ? (body?.status ?? 'unknown') : undefined,
+  const replyPromise = waitForOscReply(
+    (address, body) => address.includes('/connect') ? (body ?? {}) : undefined,
     CONNECT_TIMEOUT_MS
   );
 
   logOut(addr + (qlabPasscode ? ' (with passcode)' : ''));
+  // A workspace without a passcode accepts a bare /connect — an empty
+  // qlabPasscode in config is a supported setup, not a misconfiguration.
   if (qlabPasscode) oscClient.send(addr, qlabPasscode);
   else oscClient.send(addr);
 
-  const status = (await statusPromise) ?? 'timeout';
+  const reply = await replyPromise;
+  // QLab reports a rejected/missing passcode inside data ("badpass") while the
+  // envelope status is still "ok" — trusting status alone would mark a session
+  // connected that QLab will deny every write on.
+  let status;
+  if (!reply)                        status = 'timeout';
+  else if (reply.status !== 'ok')    status = reply.status ?? 'unknown';
+  else if (reply.data === undefined || String(reply.data).startsWith('ok')) status = 'ok';
+  else                               status = 'badpass';
+  lastConnectStatus = status;
 
   if (status === 'ok') {
     connected = true;
     log('Connected to QLab workspace');
     subscribeToUpdates();
-    queryPlayhead().catch(() => {}); // best-effort — don't delay connectQLab's return
+    queryPlayhead().catch(() => {});
+    startPlayheadPoll();
   } else {
     logErr(`Connect failed: ${status}`);
   }
@@ -171,6 +196,15 @@ function subscribeToUpdates() {
   const addr = OSC.updates();
   logOut(addr);
   oscClient.send(addr, 1);
+}
+
+// Polls QLab's playback position on an interval as a fallback for when the
+// reactive /updates push doesn't fire (e.g. GO pressed directly in QLab).
+function startPlayheadPoll() {
+  if (playheadPollTimer) return;
+  playheadPollTimer = setInterval(() => {
+    if (connected) queryPlayhead().catch(() => {});
+  }, PLAYHEAD_POLL_MS);
 }
 
 async function ensureConnected() {
@@ -262,11 +296,7 @@ async function reconnectQLab(cueNumber) {
 
 // ── Public send API ────────────────────────────────────────────────────────────
 
-async function sendCastToQLab(castMap) {
-  await ensureConnected();
-  const { castConfirmedCue } = loadConfig();
-  let allOk = true;
-
+function sendCastNotes(castMap) {
   for (const [track, actor] of Object.entries(castMap)) {
     const addr = cueAddress(track, 'notes');
     logOut(`${addr} "${actor}"`);
@@ -274,20 +304,92 @@ async function sendCastToQLab(castMap) {
       oscClient.send(addr, actor);
     } catch (err) {
       logErr(`Failed to send ${addr}: ${err.message}`);
-      allOk = false;
+    }
+  }
+}
+
+// Reads each track's notes back from QLab and compares against the actor we
+// sent. Replies to set commands also arrive on /reply/.../notes but carry no
+// data field — only GET replies do, so require body.data before comparing.
+// Resolves with the track IDs that came back wrong or never answered.
+function verifyCastInQLab(castMap) {
+  const entries = Object.entries(castMap);
+  if (entries.length === 0) return Promise.resolve([]);
+
+  return new Promise((resolve) => {
+    const pending    = new Map(entries);
+    const mismatched = [];
+    let finished = false;
+
+    function finish() {
+      if (finished) return;
+      finished = true;
+      replyBus.off('reply', onReply);
+      clearTimeout(timer);
+      resolve([...mismatched, ...pending.keys()]);
+    }
+
+    function onReply(address, args) {
+      let body;
+      try { body = JSON.parse(args[0]); } catch { return; }
+      if (body?.status !== 'ok' || body.data === undefined) return;
+      for (const [track, actor] of pending) {
+        if (!address.includes(`/cue/${track}/notes`)) continue;
+        pending.delete(track);
+        if (String(body.data) !== String(actor)) mismatched.push(track);
+        break;
+      }
+      if (pending.size === 0) finish();
+    }
+
+    replyBus.on('reply', onReply);
+    const timer = setTimeout(finish, CAST_VERIFY_MS);
+
+    try {
+      for (const [track] of entries) oscClient.send(cueAddress(track, 'notes'));
+    } catch (err) {
+      logErr(`verifyCast send failed: ${err.message}`);
+    }
+  });
+}
+
+// Sends the cast, reads it back to confirm QLab applied it, and retries once
+// over a fresh session. The CAST_CONFIRMED cue fires only after a clean
+// verify — QLab-side scripts must never read half-written notes.
+async function sendCastToQLab(castMap, { fireConfirm = true } = {}) {
+  await ensureConnected();
+
+  sendCastNotes(castMap);
+  let mismatches = await verifyCastInQLab(castMap);
+
+  if (mismatches.length > 0) {
+    logErr(`Cast verify failed for: ${mismatches.join(', ')} — reconnecting and retrying`);
+    // A stale/denied session fails every write the same way; a plain re-send
+    // would too. Reconnect first so the retry runs on a fresh session.
+    connected = false;
+    await ensureConnected();
+    const retryMap = Object.fromEntries(mismatches.map(track => [track, castMap[track]]));
+    sendCastNotes(retryMap);
+    mismatches = await verifyCastInQLab(retryMap);
+  }
+
+  const synced = mismatches.length === 0;
+  if (synced) log('Cast verified in QLab');
+  else logErr(`Cast still unverified for: ${mismatches.join(', ')}`);
+
+  if (synced && fireConfirm) {
+    const { castConfirmedCue } = loadConfig();
+    const confirmAddr = cueAddress(castConfirmedCue, 'start');
+    logOut(confirmAddr);
+    try {
+      oscClient.send(confirmAddr);
+    } catch (err) {
+      logErr(`Failed to send ${confirmAddr}: ${err.message}`);
+      return { synced: false, mismatches, connectStatus: lastConnectStatus };
     }
   }
 
-  const confirmAddr = cueAddress(castConfirmedCue, 'start');
-  logOut(confirmAddr);
-  try {
-    oscClient.send(confirmAddr);
-  } catch (err) {
-    logErr(`Failed to send ${confirmAddr}: ${err.message}`);
-    allOk = false;
-  }
-
-  return allOk;
+  return { synced, mismatches, connectStatus: connected ? 'ok' : lastConnectStatus };
 }
 
 // Writes the show's photo folder's absolute path into a memo cue's notes, so a

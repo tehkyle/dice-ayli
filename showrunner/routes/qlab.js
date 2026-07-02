@@ -3,7 +3,7 @@ const router  = express.Router();
 const path    = require('path');
 const fs      = require('fs');
 
-const { checkQLab, sendGo, sendPanicAll, reconnectQLab, getPlayhead } = require('../osc/qlabBridge');
+const { checkQLab, sendGo, sendPanicAll, reconnectQLab, getPlayhead, sendCastToQLab } = require('../osc/qlabBridge');
 
 // GET /api/qlab/status
 router.get('/status', async (req, res) => {
@@ -22,6 +22,23 @@ router.get('/status', async (req, res) => {
 // Updated reactively via QLab's /updates subscription in qlabBridge.js.
 router.get('/playhead', (req, res) => {
   res.json(getPlayhead());
+});
+
+// POST /api/qlab/sync-cast — send cast notes to QLab and verify by reading
+// them back. confirm:true also fires the CAST_CONFIRMED cue once verified —
+// only for a locked cast; the Confirm screen's pre-send passes confirm:false.
+router.post('/sync-cast', async (req, res) => {
+  try {
+    const { cast, confirm } = req.body ?? {};
+    if (!cast || typeof cast !== 'object') {
+      return res.status(400).json({ error: 'cast object required' });
+    }
+    const result = await sendCastToQLab(cast, { fireConfirm: !!confirm });
+    res.json(result);
+  } catch (err) {
+    console.error('[QLab] sync-cast failed:', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // POST /api/qlab/go

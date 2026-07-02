@@ -71,20 +71,22 @@ router.post('/:id/cast', async (req, res) => {
 
   setActiveShow(showId);
 
-  let qlabNotified = false;
+  let qlabNotified   = false;
+  let castMismatches = Object.keys(cast);
   try {
-    const castOk   = await sendCastToQLab(cast);
-    let scenesOk   = true;
+    const castResult = await sendCastToQLab(cast, { fireConfirm: true });
+    castMismatches   = castResult.mismatches;
+    let scenesOk     = true;
     if (scenes && typeof scenes === 'object') {
       scenesOk = await sendScenesToQLab(scenes, scenesOrdered || {});
     }
     const photosPathOk = await sendPhotosPathToQLab(showId);
-    qlabNotified = castOk && scenesOk && photosPathOk;
+    qlabNotified = castResult.synced && scenesOk && photosPathOk;
   } catch (err) {
     console.error(`[OSC ERR] sendCastToQLab threw: ${err.message}`);
   }
 
-  res.json({ success: true, qlabNotified, camera_url: getCameraUrl(showId) });
+  res.json({ success: true, qlabNotified, castMismatches, camera_url: getCameraUrl(showId) });
 });
 
 // POST /api/shows/:id/end — force-end a show and trigger the Sheets report

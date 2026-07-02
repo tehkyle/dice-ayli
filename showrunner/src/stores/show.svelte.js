@@ -3,6 +3,7 @@ export const showData = $state({
   perfLabel: 'Performance #—',
   lockTime: null,
   qlabNotified: false,
+  castMismatches: [],
 });
 
 export function resetShow() {
@@ -10,4 +11,5 @@ export function resetShow() {
   showData.perfLabel = 'Performance #—';
   showData.lockTime = null;
   showData.qlabNotified = false;
+  showData.castMismatches = [];
 }

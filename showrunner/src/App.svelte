@@ -62,6 +62,15 @@
           castData.selections[character_track] = actor_name;
         }
 
+        // A restart is prime territory for QLab drift — re-push the cast notes
+        // (idempotent, no confirm cue) and verify instead of assuming synced.
+        api.syncCast({ cast: castData.selections, confirm: false })
+          .then((result) => {
+            showData.qlabNotified   = !!result?.synced;
+            showData.castMismatches = result?.mismatches ?? [];
+          })
+          .catch(() => {});
+
         const scenes = active.scenes_played;
         progressData.scenesPlayed = scenes.map((entry, i) => ({
           scene:    entry.scene_name,

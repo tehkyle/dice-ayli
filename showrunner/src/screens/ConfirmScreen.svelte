@@ -1,4 +1,5 @@
 <script>
+  import { onMount } from 'svelte';
   import { nav } from '../stores/screen.svelte.js';
   import { showData } from '../stores/show.svelte.js';
   import { configData } from '../stores/config.svelte.js';
@@ -11,6 +12,33 @@
 
   let lockError = $state('');
   let locking = $state(false);
+  let syncStatus = $state('syncing'); // 'syncing' | 'synced' | 'mismatch' | 'error'
+  let syncMismatches = $state([]);
+  let syncConnectStatus = $state(null);
+
+  function trackLabel(trackId) {
+    return configData.characterTracks.find(t => t.id === trackId)?.label ?? trackId;
+  }
+
+  // Pre-sync: push the cast into QLab's notes now (without firing the confirm
+  // cue) and read it back, so the operator sees QLab state before locking.
+  async function syncToQLab() {
+    syncStatus = 'syncing';
+    try {
+      const result = await api.syncCast({ cast: castData.selections, confirm: false });
+      if (result?.error) {
+        syncStatus = 'error';
+        return;
+      }
+      syncMismatches = result.mismatches ?? [];
+      syncConnectStatus = result.connectStatus ?? null;
+      syncStatus = result.synced ? 'synced' : 'mismatch';
+    } catch {
+      syncStatus = 'error';
+    }
+  }
+
+  onMount(syncToQLab);
 
   async function lock() {
     locking = true;
@@ -24,6 +52,7 @@
       });
       showData.lockTime = new Date();
       showData.qlabNotified = lockData.qlabNotified ?? false;
+      showData.castMismatches = lockData.castMismatches ?? [];
       photoWindowState.open = true;
       resetProgress();
       nav.screen = 'progress';
@@ -53,6 +82,23 @@
       {/if}
     {/each}
   </div>
+
+  {#if syncStatus === 'syncing'}
+    <div class="lock-status">Syncing cast to QLab…</div>
+  {:else if syncStatus === 'synced'}
+    <div class="lock-status success">✓ Cast synced to QLab</div>
+  {:else}
+    <div class="lock-status warn">
+      {#if syncConnectStatus === 'badpass'}
+        ⚠ QLab passcode required or incorrect — check settings.
+      {:else if syncStatus === 'mismatch'}
+        ⚠ QLab out of sync: {syncMismatches.map(trackLabel).join(', ')}
+      {:else}
+        ⚠ Could not reach QLab to verify cast.
+      {/if}
+      <button class="btn" onclick={syncToQLab}>Retry</button>
+    </div>
+  {/if}
 
   {#if lockError}
     <div class="lock-status warn">{lockError}</div>

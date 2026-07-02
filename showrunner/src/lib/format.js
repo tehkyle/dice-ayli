@@ -19,8 +19,10 @@ export function formatRunTime(startIso, endIso) {
 export function formatDuration(ms) {
   if (ms == null || ms < 0) return '—';
   const totalSec = Math.round(ms / 1000);
-  const m = Math.floor(totalSec / 60);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
   const s = totalSec % 60;
+  if (h > 0) return `${h}h ${m}m ${s}s`;
   return m > 0 ? `${m}m ${s}s` : `${s}s`;
 }
 
