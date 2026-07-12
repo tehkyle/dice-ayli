@@ -323,6 +323,8 @@
     <video bind:this={videoEl} class="camera-video" autoplay playsinline muted></video>
     <canvas bind:this={canvasEl} class="camera-canvas-hidden"></canvas>
 
+    <div class="camera-grid-guide" aria-hidden="true"></div>
+
     <div class="camera-top-right">
       <div class="camera-count">{sessionCount} photo{sessionCount === 1 ? '' : 's'} taken</div>
       <button class="camera-view-photos" onclick={openGallery}>View Photos</button>

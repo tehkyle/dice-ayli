@@ -1757,6 +1757,19 @@ body.history-page {
   display: none;
 }
 
+/* Marks the crop the show reliably uses later — sized off the smaller viewport
+   dimension so it stays fully visible regardless of phone orientation. */
+.camera-grid-guide {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: min(80vw, 80vh);
+  height: min(80vw, 80vh);
+  transform: translate(-50%, -50%);
+  border: 2px dotted rgba(255, 255, 255, 0.8);
+  pointer-events: none;
+}
+
 .camera-shutter {
   position: absolute;
   bottom: 36px;
