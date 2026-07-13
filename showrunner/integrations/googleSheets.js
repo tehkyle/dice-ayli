@@ -12,6 +12,20 @@ function timestamp() {
   return new Date().toISOString();
 }
 
+// The column shape is derived from config's acts/scenes/tracks, so it must be
+// rebuilt from the SAME config every time — never hand-edited independently of
+// the row-building logic below, or the two will drift out of sync with each other.
+function buildHeaderRow(config) {
+  const trackHeaders = (config.characterTracks || []).map(t => t.label);
+  const sceneHeaders = [];
+  for (const act of (config.acts || [])) {
+    sceneHeaders.push(`${act.label} Order`);
+    for (const sceneName of act.scenes) sceneHeaders.push(sceneName);
+  }
+  const staticHeaders = config.staticScenes || [];
+  return ['Date', 'Start Time', 'Run Time', 'Showrunner', ...trackHeaders, ...sceneHeaders, ...staticHeaders];
+}
+
 function buildAuth() {
   const tokens = getTokens();
   if (!tokens) throw new Error('[Sheets] No OAuth tokens — connect Google account via the config modal');
@@ -123,31 +137,34 @@ async function appendShowToSheet(show, performanceNumber, castAssignments, scene
   const tsvRow = [showDate, startTime, runTime, showrunnerEmail, ...castColumns, ...actSceneColumnsTsv, ...staticSceneColumnsTsv].join('\t');
 
   try {
-    // Auto-write header row + set column formats if A1 is empty
+    const expectedHeader = buildHeaderRow(config);
+
+    // Full row, not just A1 — a single-cell check can't tell "no header yet"
+    // apart from "header written for a since-changed act/scene list."
     const headerCheck = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `${sheetTabName}!A1`,
+      range: `${sheetTabName}!1:1`,
     });
-    const hasHeader = !!(headerCheck.data.values?.[0]?.[0]);
-    if (!hasHeader) {
-      const trackHeaders  = (config.characterTracks || []).map(t => t.label);
-      const sceneHeaders  = [];
-      for (const act of (config.acts || [])) {
-        sceneHeaders.push(`${act.label} Order`);
-        for (const sceneName of act.scenes) sceneHeaders.push(sceneName);
-      }
-      const staticHeaders = config.staticScenes || [];
-      const headerRow = ['Date', 'Start Time', 'Run Time', 'Showrunner', ...trackHeaders, ...sceneHeaders, ...staticHeaders];
+    const existingHeader = headerCheck.data.values?.[0] ?? [];
 
+    if (existingHeader.length === 0) {
       await sheets.spreadsheets.values.update({
         spreadsheetId,
         range:            `${sheetTabName}!A1`,
         valueInputOption: 'RAW',
-        requestBody:      { values: [headerRow] },
+        requestBody:      { values: [expectedHeader] },
       });
       console.log(`[Sheets] ${timestamp()} Header row written to "${sheetTabName}"`);
 
       await applyColumnFormats(sheets, spreadsheetId, sheetTabName, config);
+    } else if (existingHeader.length !== expectedHeader.length || !existingHeader.every((c, i) => c === expectedHeader[i])) {
+      // An act's scene list changed (e.g. a scene was added/removed) after this
+      // sheet's header was written. Appending now would silently shift every
+      // later column out from under its label — refuse instead, so the operator
+      // fixes the sheet by hand (new tab, or edit the header + realign columns)
+      // rather than getting quietly corrupted data.
+      console.error(`[Sheets ERR] ${timestamp()} Header in "${sheetTabName}" doesn't match the current scene config — refusing to append. Expected: [${expectedHeader.join(', ')}] — Actual: [${existingHeader.join(', ')}]`);
+      return { success: false, tsvRow };
     }
 
     console.log(`[Sheets] ${timestamp()} Appending row for show ${show.id} to "${sheetTabName}": ${row.join(' | ')}`);
@@ -218,4 +235,4 @@ async function applyColumnFormats(sheets, spreadsheetId, sheetTabName, config) {
   }
 }
 
-module.exports = { appendShowToSheet };
+module.exports = { appendShowToSheet, buildHeaderRow };
