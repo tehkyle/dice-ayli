@@ -53,17 +53,16 @@ function getLanIp() {
   return lan ? lan.address : 'localhost';
 }
 
-// Builds the operator camera URL. getUserMedia requires https, so this is always
-// https — either a real domain (config.cameraHostname, set up with a trusted cert
-// and router DNS override for production) or the auto-detected LAN IP (self-signed
-// cert, browser shows a one-time warning) as a fallback for ad-hoc networks.
-function getCameraUrl(showId, httpsPort) {
+// Builds the standing camera URL — no show id in it, so the same QR code/link
+// works for every performance. The camera page resolves "current show" itself
+// (GET /api/shows/latest) rather than being told which show via the URL.
+function getCameraUrl() {
   let config = {};
   try { config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8')); } catch {}
 
   const host = config.cameraHostname || getLanIp();
-  const port = httpsPort || config.cameraHttpsPort || 8443;
-  return `https://${host}:${port}/camera?show=${showId}`;
+  const port = parseInt(process.env.PORT, 10) || 3000;
+  return `http://${host}:${port}/camera`;
 }
 
 module.exports = { buildOAuthClient, createOAuth2Client, formatShow, extractWorkspaceId, getLanIp, getCameraUrl };

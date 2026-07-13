@@ -1724,67 +1724,55 @@ body.history-page {
 
 /* Operator camera page */
 
-.camera-message {
+.camera-main {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
   align-items: center;
+  justify-content: center;
+  gap: 24px;
+  padding: 24px;
   text-align: center;
 }
 
-.camera-pulse {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: var(--accent);
-  animation: pulse 1.2s ease-in-out infinite;
-}
-
-.camera-active {
-  position: fixed;
-  inset: 0;
-  background: #000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  touch-action: none;
-}
-
-.camera-video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.camera-canvas-hidden {
-  display: none;
-}
-
-/* Marks the crop the show reliably uses later — sized off the smaller viewport
-   dimension so it stays fully visible regardless of phone orientation. */
-.camera-grid-guide {
+.camera-file-input {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  width: min(80vw, 80vh);
-  height: min(80vw, 80vh);
-  transform: translate(-50%, -50%);
-  border: 2px dotted rgba(255, 255, 255, 0.8);
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
   pointer-events: none;
 }
 
-.camera-shutter {
-  position: absolute;
-  bottom: 36px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 76px;
-  height: 76px;
+.camera-shutter-btn {
+  width: 200px;
+  height: 200px;
   border-radius: 50%;
-  background: #fff;
-  border: 6px solid rgba(255, 255, 255, 0.4);
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  font-size: 1.4rem;
+  font-weight: 700;
   cursor: pointer;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
 }
 
-.camera-shutter:active {
-  background: var(--accent);
+.camera-shutter-btn:active {
+  transform: scale(0.97);
+}
+
+.camera-shutter-btn:disabled {
+  background: var(--surface-2);
+  color: var(--text-dim);
+  cursor: default;
+  box-shadow: none;
+}
+
+.camera-status-text {
+  color: var(--text-dim);
+  font-size: 1rem;
 }
 
 .camera-top-right {
@@ -1797,8 +1785,8 @@ body.history-page {
 }
 
 .camera-count {
-  background: rgba(0, 0, 0, 0.55);
-  color: #fff;
+  background: var(--surface-2);
+  color: var(--text);
   font-size: 0.8rem;
   padding: 8px 14px;
   border-radius: 20px;
@@ -1819,46 +1807,6 @@ body.history-page {
   cursor: pointer;
 }
 
-.camera-flip {
-  position: absolute;
-  top: 16px;
-  left: 16px;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.55);
-  color: #fff;
-  border: none;
-  font-size: 1.3rem;
-  cursor: pointer;
-}
-
-.camera-zoom-row {
-  position: absolute;
-  bottom: 130px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 60%;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.camera-zoom {
-  flex: 1;
-  accent-color: var(--accent);
-}
-
-.camera-zoom-value {
-  color: #fff;
-  font-size: 0.8rem;
-  font-weight: 700;
-  background: rgba(0, 0, 0, 0.55);
-  padding: 4px 8px;
-  border-radius: 6px;
-  flex-shrink: 0;
-}
-
 .camera-thumb-flash {
   position: absolute;
   top: 16px;
@@ -1867,7 +1815,7 @@ body.history-page {
   height: 64px;
   object-fit: cover;
   border-radius: 8px;
-  border: 2px solid #fff;
+  border: 2px solid var(--border);
 }
 
 .camera-upload-error {
@@ -1903,10 +1851,49 @@ body.history-page {
   height: 100%;
 }
 
+button.photo-thumb-link {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
 .photo-thumb-img {
   object-fit: cover;
   border-radius: 6px;
   border: 1px solid var(--border);
+}
+
+.photo-lightbox-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.photo-lightbox-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 6px;
+}
+
+.photo-lightbox-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  border: none;
+  font-size: 1rem;
+  cursor: pointer;
 }
 
 .photo-thumb-delete {

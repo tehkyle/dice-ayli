@@ -5,13 +5,9 @@ try {
   if (err.code !== 'ENOENT') throw err;
 }
 
-const fs    = require('fs');
-const https = require('https');
 const express = require('express');
 
 const { getDb } = require('./db/database');
-const { getLanIp } = require('./utils');
-const { getCameraCredentials } = require('./https-cert');
 const { startReceiver, setActiveShow } = require('./osc/qlabBridge');
 const showsRouter  = require('./routes/shows');
 const configRouter = require('./routes/config');
@@ -57,21 +53,3 @@ startReceiver(db, broadcast);
 app.listen(PORT, () => {
   console.log(`[SERVER] Dacha DICE: AYLI running at http://localhost:${PORT}`);
 });
-
-// Separate HTTPS listener for operator phones — getUserMedia requires a secure
-// context, so /camera only works when loaded over this. Failure here shouldn't
-// take down the main SM-facing http server.
-(async () => {
-  let config = {};
-  try { config = JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json'), 'utf8')); } catch {}
-
-  const httpsPort = parseInt(config.cameraHttpsPort, 10) || 8443;
-  try {
-    const credentials = await getCameraCredentials(config, getLanIp());
-    https.createServer(credentials, app).listen(httpsPort, () => {
-      console.log(`[SERVER] Camera HTTPS listening at https://${config.cameraHostname || getLanIp()}:${httpsPort}`);
-    });
-  } catch (err) {
-    console.error(`[SERVER] Could not start camera HTTPS listener: ${err.message}`);
-  }
-})();

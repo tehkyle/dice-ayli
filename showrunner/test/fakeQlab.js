@@ -62,7 +62,7 @@ function startFakeQlab() {
 
     if (address.endsWith(`/cue/${config.qlabMainCueList}/uniqueID`)) {
       send({ status: 'ok', data: MAIN_LIST_ID });
-    } else if (address.endsWith(`/cue/${config.qlabMainCueList}/playbackPositionId`)) {
+    } else if (address.endsWith(`/cue/${config.qlabMainCueList}/playbackPositionID`)) {
       send({ status: 'ok', data: fake.playbackPositionId });
     } else if ((m = address.match(/\/cue_id\/CUE-(\d+)\/number$/))) {
       send({ status: 'ok', data: m[1] });

@@ -15,6 +15,17 @@ const upload = multer({
   limits:  { fileSize: 8 * 1024 * 1024 },
 });
 
+// The camera page now hands over whatever the phone's native camera app produced,
+// not a JPEG we encoded ourselves — iOS and Android both hand back JPEG for a
+// direct camera capture in practice, so this covers the real world. HEIC/HEIF
+// isn't accepted because browsers can't render it in an <img>, which would break
+// the gallery; add server-side conversion here if that ever actually shows up.
+const ALLOWED_MIME_EXT = {
+  'image/jpeg': 'jpg',
+  'image/png':  'png',
+  'image/webp': 'webp',
+};
+
 function timestampSlug(d = new Date()) {
   return d.toISOString().replace(/[-:]/g, '').slice(0, 15);
 }
@@ -27,7 +38,7 @@ function photosForShow(db, showId) {
   return { show_id: showId, count: photos.length, photos };
 }
 
-// POST /api/photos/upload — operator camera page posts a captured JPEG
+// POST /api/photos/upload — camera page posts a photo from the phone's native camera
 router.post('/upload', upload.single('photo'), (req, res) => {
   const db     = getDb();
   const showId = parseInt(req.body.show_id, 10);
@@ -36,12 +47,15 @@ router.post('/upload', upload.single('photo'), (req, res) => {
   const show = db.data.shows.find(s => s.id === showId);
   if (!show) return res.status(404).json({ error: 'Show not found' });
   if (!show.photo_window_open) return res.status(403).json({ error: 'Upload window is closed' });
-  if (!req.file || req.file.mimetype !== 'image/jpeg') {
-    return res.status(400).json({ error: 'A JPEG photo is required' });
+  if (!req.file) return res.status(400).json({ error: 'A photo is required' });
+
+  const ext = ALLOWED_MIME_EXT[req.file.mimetype];
+  if (!ext) {
+    return res.status(400).json({ error: `Unsupported photo format (${req.file.mimetype})` });
   }
 
   const dir      = path.join(PHOTOS_DIR, String(showId));
-  const filename = `${timestampSlug()}_${crypto.randomBytes(2).toString('hex')}.jpg`;
+  const filename = `${timestampSlug()}_${crypto.randomBytes(2).toString('hex')}.${ext}`;
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, filename), req.file.buffer);
 

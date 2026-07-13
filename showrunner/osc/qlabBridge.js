@@ -278,10 +278,10 @@ async function queryPlayhead() {
   if (!qlabMainCueList) return;
 
   const idPromise = waitForOscReply(
-    (addr, body) => addr.includes(`/cue/${qlabMainCueList}/playbackPositionId`) ? (body?.data ?? '') : undefined,
+    (addr, body) => addr.includes(`/cue/${qlabMainCueList}/playbackPositionID`) ? (body?.data ?? '') : undefined,
     PLAYHEAD_QUERY_MS
   );
-  oscClient.send(cueAddress(qlabMainCueList, 'playbackPositionId'));
+  oscClient.send(cueAddress(qlabMainCueList, 'playbackPositionID'));
   const cueId = await idPromise;
   if (!cueId || cueId === 'none') return;
 

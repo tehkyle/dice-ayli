@@ -1,5 +1,5 @@
 <script>
-  import { onMount, onDestroy, tick } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { api } from '../lib/api.js';
   import { getSocket } from '../lib/socket.js';
   import PhotoThumbGrid from '../components/PhotoThumbGrid.svelte';
@@ -12,16 +12,13 @@
   let sessionCount = $state(0);
   let uploadError  = $state(false);
   let thumbnailUrl = $state('');
-  let capturing    = false;
+  let capturing    = $state(false);
   let everActive   = false;
 
-  let videoEl  = $state(null);
-  let canvasEl = $state(null);
-  let stream   = null;
-  let videoTrack = null;
+  let fileInputEl = $state(null);
   let pollTimer = null;
   let thumbTimer = null;
-  let usesLatest = false; // true when opened with no ?show= (e.g. a saved home-screen icon)
+  let usesLatest = false; // true when opened with no ?show= (the standing, printable camera link)
 
   let fullscreenSupported = typeof document !== 'undefined' &&
     !!(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen);
@@ -38,50 +35,6 @@
 
   function onFullscreenChange() {
     isFullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement);
-  }
-
-  let facingMode    = $state('environment'); // 'environment' | 'user'
-  let zoomSupported = $state(false);
-  let zoomMin       = $state(1);
-  let zoomMax       = $state(1);
-  let zoomValue     = $state(1);
-  let zoomT         = $state(0); // 0..1 slider position — mapped exponentially onto zoomMin..zoomMax
-
-  // Zoom capability is a linear magnification factor (e.g. 1x..8x), but a constant
-  // step in magnification *feels* much bigger near 1x than near 8x. Map the slider
-  // position exponentially so each bit of slider travel is an equal relative change,
-  // matching how native camera apps (and pinch gestures) actually feel.
-  function zoomToT(zoom) {
-    if (zoomMax <= zoomMin) return 0;
-    return Math.log(zoom / zoomMin) / Math.log(zoomMax / zoomMin);
-  }
-
-  function tToZoom(t) {
-    return zoomMin * Math.pow(zoomMax / zoomMin, t);
-  }
-
-  function readZoomCapabilities() {
-    const caps = videoTrack.getCapabilities?.() ?? {};
-    if (caps.zoom) {
-      zoomSupported = true;
-      zoomMin   = Math.max(caps.zoom.min, 0.01); // guard against a 0 min breaking the log mapping
-      zoomMax   = caps.zoom.max;
-      zoomValue = videoTrack.getSettings?.().zoom ?? zoomMin;
-      zoomT     = zoomToT(zoomValue);
-    } else {
-      zoomSupported = false;
-    }
-  }
-
-  function applyZoom(zoom) {
-    zoomValue = Math.min(Math.max(zoom, zoomMin), zoomMax);
-    zoomT = zoomToT(zoomValue);
-    videoTrack?.applyConstraints({ advanced: [{ zoom: zoomValue }] }).catch(() => {});
-  }
-
-  function onZoomSlider(t) {
-    zoomT = t;
-    applyZoom(tToZoom(t));
   }
 
   let galleryOpen    = $state(false);
@@ -108,75 +61,8 @@
     galleryPhotos = galleryPhotos.filter(p => p.filename !== filename);
   }
 
-  let pinchStartDist = null;
-  let pinchStartZoom = 1;
-
-  function touchDistance(touches) {
-    const [a, b] = touches;
-    return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
-  }
-
-  function onTouchStart(e) {
-    if (zoomSupported && e.touches.length === 2) {
-      pinchStartDist = touchDistance(e.touches);
-      pinchStartZoom = zoomValue;
-    }
-  }
-
-  function onTouchMove(e) {
-    if (pinchStartDist && e.touches.length === 2) {
-      e.preventDefault();
-      applyZoom(pinchStartZoom * (touchDistance(e.touches) / pinchStartDist));
-    }
-  }
-
-  function onTouchEnd(e) {
-    if (e.touches.length < 2) pinchStartDist = null;
-  }
-
-  async function startCamera() {
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode },
-        audio: false,
-      });
-      videoTrack = stream.getVideoTracks()[0];
-      readZoomCapabilities();
-      // The <video> element only exists once phase === 'active' renders it,
-      // so flip the phase and wait for the DOM update before attaching the stream.
-      phase = 'active';
-      everActive = true;
-      await tick();
-      if (videoEl) {
-        videoEl.srcObject = stream;
-        videoEl.play().catch(() => {});
-      }
-    } catch {
-      phase = 'error';
-      errorMessage = 'Camera access is required. Please allow camera access and reload.';
-    }
-  }
-
-  function stopCamera() {
-    if (stream) {
-      stream.getTracks().forEach(t => t.stop());
-      stream = null;
-      videoTrack = null;
-    }
-    if (videoEl) videoEl.srcObject = null;
-  }
-
-  async function flipCamera() {
-    if (capturing) return;
-    facingMode = facingMode === 'environment' ? 'user' : 'environment';
-    stopCamera();
-    await startCamera();
-  }
-
-  // For a saved home-screen icon (no fixed show id), re-resolve the current show
-  // on every poll so a stale icon from a past performance picks up tonight's show
-  // automatically instead of being stuck pointing at whatever show existed when
-  // the icon was first added.
+  // The QR/link is the same for every show, so on every poll we re-resolve
+  // "current show" rather than being told which one via the URL.
   async function resolveShowId() {
     if (!usesLatest) return showId;
     try {
@@ -186,7 +72,6 @@
         showId = latest.id;
         everActive = false;
         sessionCount = 0;
-        if (phase === 'active') stopCamera();
         phase = 'waiting';
       }
       return showId;
@@ -208,16 +93,16 @@
       return;
     }
     if (open) {
-      if (phase !== 'active') await startCamera();
+      phase = 'active';
+      everActive = true;
     } else if (phase !== 'error') {
-      if (phase === 'active') stopCamera();
       phase = everActive ? 'closed' : 'waiting';
     }
   }
 
-  function flashThumbnail(blob) {
+  function flashThumbnail(file) {
     if (thumbnailUrl) URL.revokeObjectURL(thumbnailUrl);
-    thumbnailUrl = URL.createObjectURL(blob);
+    thumbnailUrl = URL.createObjectURL(file);
     clearTimeout(thumbTimer);
     thumbTimer = setTimeout(() => {
       URL.revokeObjectURL(thumbnailUrl);
@@ -225,10 +110,10 @@
     }, 1200);
   }
 
-  async function upload(blob, isRetry = false) {
+  async function upload(file, isRetry = false) {
     const formData = new FormData();
     formData.append('show_id', showId);
-    formData.append('photo', blob, 'photo.jpg');
+    formData.append('photo', file, file.name || 'photo');
 
     try {
       const res  = await fetch('/api/photos/upload', { method: 'POST', body: formData });
@@ -236,9 +121,9 @@
       if (!res.ok || !data.success) throw new Error(data.error || 'upload failed');
       sessionCount += 1;
       uploadError = false;
-      flashThumbnail(blob);
+      flashThumbnail(file);
     } catch {
-      if (!isRetry) return upload(blob, true);
+      if (!isRetry) return upload(file, true);
       uploadError = true;
       setTimeout(() => { uploadError = false; }, 1500);
     } finally {
@@ -246,18 +131,20 @@
     }
   }
 
-  function capture() {
-    if (capturing || !videoEl || !videoEl.videoWidth) return;
+  // The file input's capture="environment" hint opens the phone's native camera
+  // app directly — full manual control (zoom, focus, flash) instead of reimplementing
+  // it over getUserMedia, which only ever exposed a digital zoom anyway.
+  function handleFileSelected(e) {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // clear so capturing the same shot again still fires a change event
+    if (!file || capturing) return;
     capturing = true;
-    try {
-      canvasEl.width  = videoEl.videoWidth;
-      canvasEl.height = videoEl.videoHeight;
-      canvasEl.getContext('2d').drawImage(videoEl, 0, 0);
-    } catch {
-      capturing = false;
-      return;
-    }
-    canvasEl.toBlob(blob => { if (blob) upload(blob); else capturing = false; }, 'image/jpeg', 0.85);
+    upload(file);
+  }
+
+  function triggerCapture() {
+    if (capturing || phase !== 'active') return;
+    fileInputEl?.click();
   }
 
   onMount(() => {
@@ -288,7 +175,6 @@
   onDestroy(() => {
     clearInterval(pollTimer);
     clearTimeout(thumbTimer);
-    stopCamera();
     document.removeEventListener('fullscreenchange', onFullscreenChange);
     document.removeEventListener('webkitfullscreenchange', onFullscreenChange);
     getSocket().off('photos_changed');
@@ -313,60 +199,42 @@
   </div>
 {/if}
 
-{#if phase === 'active'}
-  <div
-    class="camera-active"
-    ontouchstart={onTouchStart}
-    ontouchmove={onTouchMove}
-    ontouchend={onTouchEnd}
+<div class="camera-main">
+  <div class="camera-top-right">
+    <div class="camera-count">{sessionCount} photo{sessionCount === 1 ? '' : 's'} taken</div>
+    <button class="camera-view-photos" onclick={openGallery}>View Photos</button>
+  </div>
+
+  <input
+    bind:this={fileInputEl}
+    type="file"
+    accept="image/*"
+    capture="environment"
+    class="camera-file-input"
+    onchange={handleFileSelected}
+  />
+
+  <button
+    class="camera-shutter-btn"
+    disabled={phase !== 'active' || capturing}
+    onclick={triggerCapture}
   >
-    <video bind:this={videoEl} class="camera-video" autoplay playsinline muted></video>
-    <canvas bind:this={canvasEl} class="camera-canvas-hidden"></canvas>
+    {capturing ? 'Uploading…' : 'Take Photo'}
+  </button>
 
-    <div class="camera-grid-guide" aria-hidden="true"></div>
+  {#if phase === 'waiting'}
+    <div class="camera-status-text">Waiting for show to start…</div>
+  {:else if phase === 'closed'}
+    <div class="camera-status-text">Show complete. Thank you.</div>
+  {:else if phase === 'error'}
+    <div class="camera-status-text">{errorMessage}</div>
+  {/if}
 
-    <div class="camera-top-right">
-      <div class="camera-count">{sessionCount} photo{sessionCount === 1 ? '' : 's'} taken</div>
-      <button class="camera-view-photos" onclick={openGallery}>View Photos</button>
-    </div>
+  {#if thumbnailUrl}
+    <img src={thumbnailUrl} alt="Last capture" class="camera-thumb-flash" />
+  {/if}
 
-    <button class="camera-flip" aria-label="Flip camera" onclick={flipCamera}>⟲</button>
-
-    {#if zoomSupported}
-      <div class="camera-zoom-row">
-        <input
-          class="camera-zoom"
-          type="range"
-          min="0"
-          max="1"
-          step="0.001"
-          value={zoomT}
-          oninput={(e) => onZoomSlider(Number(e.target.value))}
-          aria-label="Zoom"
-        />
-        <span class="camera-zoom-value">{zoomValue.toFixed(1)}x</span>
-      </div>
-    {/if}
-
-    {#if thumbnailUrl}
-      <img src={thumbnailUrl} alt="Last capture" class="camera-thumb-flash" />
-    {/if}
-
-    {#if uploadError}
-      <div class="camera-upload-error">Upload failed — retrying…</div>
-    {/if}
-
-    <button class="camera-shutter" aria-label="Take photo" onclick={capture}></button>
-  </div>
-{:else}
-  <div class="screen-inner camera-message">
-    {#if phase === 'waiting'}
-      <div class="camera-pulse"></div>
-      <h2 class="screen-title">Waiting for show to start…</h2>
-    {:else if phase === 'closed'}
-      <h2 class="screen-title">Show complete. Thank you.</h2>
-    {:else}
-      <h2 class="screen-title">{errorMessage}</h2>
-    {/if}
-  </div>
-{/if}
+  {#if uploadError}
+    <div class="camera-upload-error">Upload failed — retrying…</div>
+  {/if}
+</div>

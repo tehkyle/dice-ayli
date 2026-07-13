@@ -5,6 +5,7 @@
 
   let confirmingFilename = $state(null);
   let deletingFilename   = $state(null);
+  let previewPhoto       = $state(null);
 
   function askDelete(filename) {
     confirmingFilename = filename;
@@ -23,7 +24,25 @@
     deletingFilename = null;
     confirmingFilename = null;
   }
+
+  function openPreview(photo) {
+    previewPhoto = photo;
+  }
+
+  function closePreview() {
+    previewPhoto = null;
+  }
+
+  function handleOverlayClick(e) {
+    if (e.target === e.currentTarget) closePreview();
+  }
+
+  function handleKeydown(e) {
+    if (e.key === 'Escape' && previewPhoto) closePreview();
+  }
 </script>
+
+<svelte:window onkeydown={handleKeydown} />
 
 <div class="photo-thumb-grid">
   {#each photos as photo (photo.filename)}
@@ -34,7 +53,9 @@
           <img src={url} alt={photo.filename} loading="lazy" class="photo-thumb-img" />
         </a>
       {:else}
-        <img src={url} alt={photo.filename} loading="lazy" class="photo-thumb-img" />
+        <button type="button" class="photo-thumb-link" onclick={() => openPreview(photo)}>
+          <img src={url} alt={photo.filename} loading="lazy" class="photo-thumb-img" />
+        </button>
         <button class="photo-thumb-delete" aria-label="Delete photo" onclick={() => askDelete(photo.filename)}>✕</button>
       {/if}
 
@@ -58,3 +79,15 @@
     <div class="photo-thumb-empty">No photos yet.</div>
   {/if}
 </div>
+
+{#if previewPhoto}
+  <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_noninteractive_element_interactions -->
+  <div class="photo-lightbox-overlay" role="dialog" aria-modal="true" onclick={handleOverlayClick}>
+    <button class="photo-lightbox-close" aria-label="Close" onclick={closePreview}>✕</button>
+    <img
+      src={`/photos/${showId}/${previewPhoto.filename}`}
+      alt={previewPhoto.filename}
+      class="photo-lightbox-img"
+    />
+  </div>
+{/if}

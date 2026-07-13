@@ -86,7 +86,7 @@ router.post('/:id/cast', async (req, res) => {
     console.error(`[OSC ERR] sendCastToQLab threw: ${err.message}`);
   }
 
-  res.json({ success: true, qlabNotified, castMismatches, camera_url: getCameraUrl(showId) });
+  res.json({ success: true, qlabNotified, castMismatches, camera_url: getCameraUrl() });
 });
 
 // POST /api/shows/:id/end — force-end a show and trigger the Sheets report
@@ -167,7 +167,7 @@ router.post('/:id/photo-window/open', (req, res) => {
     success:        true,
     show_id:        showId,
     window_open_at: show.photo_window_opened_at,
-    camera_url:     getCameraUrl(showId),
+    camera_url:     getCameraUrl(),
   });
 });
 
@@ -193,7 +193,7 @@ router.get('/:id/photo-window/status', (req, res) => {
   const show   = db.data.shows.find(s => s.id === showId);
   if (!show) return res.json({ open: false });
 
-  res.json({ open: !!show.photo_window_open, show_id: showId, camera_url: getCameraUrl(showId) });
+  res.json({ open: !!show.photo_window_open, show_id: showId, camera_url: getCameraUrl() });
 });
 
 // GET /api/shows/latest — most recent show that hasn't ended yet (locked or not).
