@@ -6,8 +6,9 @@
 
 const fs = require('fs');
 const path = require('path');
+const { DATA_DIR } = require('../dataDir');
 
-const DB_PATH = path.join(__dirname, '../db/showrunner.json');
+const DB_PATH = path.join(DATA_DIR, 'db', 'showrunner.json');
 
 const empty = { shows: [], cast_assignments: [], scene_log: [] };
 

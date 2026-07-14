@@ -5,7 +5,6 @@ export function initCastFromTracks(tracks) {
   castData.selections = Object.fromEntries(tracks.map(t => [t.id, '']));
 }
 
-const DJ_TRACK     = 'Track_DJ';
 const SINGER_TRACK = 'Track_Singer';
 
 export function randomizeCast(actors) {
@@ -24,11 +23,11 @@ export function randomizeCast(actors) {
     if (i < pool.length) castData.selections[trackId] = pool[i];
   });
 
-  // Singer is a double role — pick one of the now-filled non-DJ tracks' actors
-  // rather than handing them a separate unique slot.
+  // Singer is a double role — pick one of the now-filled other tracks' actors
+  // (DJ included) rather than handing them a separate unique slot.
   if (unfilled.includes(SINGER_TRACK)) {
     const candidates = Object.entries(castData.selections)
-      .filter(([trackId, actor]) => actor && trackId !== DJ_TRACK && trackId !== SINGER_TRACK)
+      .filter(([trackId, actor]) => actor && trackId !== SINGER_TRACK)
       .map(([, actor]) => actor);
     if (candidates.length > 0) {
       castData.selections[SINGER_TRACK] = candidates[Math.floor(Math.random() * candidates.length)];

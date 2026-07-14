@@ -1,9 +1,14 @@
 const { app, BrowserWindow, utilityProcess, dialog, globalShortcut, shell } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
+const fs   = require('fs');
 const http = require('http');
 
 const PORT = parseInt(process.env.PORT, 10) || 3000;
+
+// Show history (db + photos) lives in userData, not the app bundle, so it
+// survives the bundle being wholesale replaced on every app upgrade.
+const DATA_DIR = app.getPath('userData');
 
 // Startup polling — wait up to 10 seconds for the server to respond
 const SERVER_POLL_INTERVAL_MS = 250;
@@ -30,13 +35,35 @@ function showFatalError(title) {
   );
 }
 
+// One-time carry-over for installs that still have show history sitting in
+// the old location (inside the app bundle, from before DATA_DIR moved to
+// userData). Safe to run every launch: no-ops once userData has its own db.
+function migrateLegacyData() {
+  const legacyDb     = path.join(app.getAppPath(), 'db', 'showrunner.json');
+  const legacyPhotos = path.join(app.getAppPath(), 'photos');
+  const newDb        = path.join(DATA_DIR, 'db', 'showrunner.json');
+  const newPhotos    = path.join(DATA_DIR, 'photos');
+
+  if (fs.existsSync(newDb)) return;
+
+  if (fs.existsSync(legacyDb)) {
+    fs.mkdirSync(path.dirname(newDb), { recursive: true });
+    fs.copyFileSync(legacyDb, newDb);
+    log('[Migration] Carried over existing show history to userData');
+  }
+  if (fs.existsSync(legacyPhotos)) {
+    fs.cpSync(legacyPhotos, newPhotos, { recursive: true });
+    log('[Migration] Carried over existing photos to userData');
+  }
+}
+
 function startServer() {
   const appRoot = app.getAppPath();
   log(`[Electron] appRoot: ${appRoot}`);
 
   serverProcess = utilityProcess.fork(path.join(appRoot, 'server.js'), [], {
     cwd:   appRoot,
-    env:   { ...process.env, PORT: String(PORT) },
+    env:   { ...process.env, PORT: String(PORT), SHOWRUNNER_DATA_DIR: DATA_DIR },
     stdio: 'pipe',
   });
 
@@ -117,6 +144,7 @@ function setupUpdater() {
 }
 
 app.whenReady().then(() => {
+  migrateLegacyData();
   startServer();
   waitForServer(() => {
     createWindow();

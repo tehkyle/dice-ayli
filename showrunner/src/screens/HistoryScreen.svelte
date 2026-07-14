@@ -12,6 +12,7 @@
   let error = $state('');
   let loading = $state(true);
   let clearConfirm = $state(false);
+  let importing = $state(false);
 
   // Shows grouped by date: [{ date, shows[] }]
   let grouped = $derived.by(() => {
@@ -52,13 +53,41 @@
     }
     clearConfirm = false;
   }
+
+  async function importHistoryFile(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    importing = true;
+    error = '';
+    try {
+      const result = await api.importHistory(file);
+      if (result.error) throw new Error(result.error);
+      shows = await api.getShows();
+    } catch (err) {
+      error = err.message || 'Failed to import history.';
+    }
+    importing = false;
+    e.target.value = '';
+  }
 </script>
 
 <div class="history-page">
   <header class="history-header">
     <a href="/" class="history-back">← Back to Showrunner</a>
     <h1 class="history-title">Show History</h1>
+    <label class="btn-history">
+      {importing ? 'Importing…' : 'Import history (.zip)'}
+      <input
+        type="file"
+        accept=".zip"
+        hidden
+        disabled={importing}
+        onchange={importHistoryFile}
+      />
+    </label>
     {#if shows.length > 0}
+      <a href="/api/shows/export" download class="btn-history">Export history (.zip)</a>
       {#if clearConfirm}
         <span class="history-clear-confirm">
           Delete ALL shows permanently?

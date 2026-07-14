@@ -8,8 +8,9 @@ const archiver = require('archiver');
 
 const { getDb, nextId } = require('../db/database');
 const { broadcast } = require('./events');
+const { DATA_DIR } = require('../dataDir');
 
-const PHOTOS_DIR = path.join(__dirname, '../photos');
+const PHOTOS_DIR = path.join(DATA_DIR, 'photos');
 const upload = multer({
   storage: multer.memoryStorage(),
   limits:  { fileSize: 8 * 1024 * 1024 },

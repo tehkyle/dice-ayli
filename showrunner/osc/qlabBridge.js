@@ -3,6 +3,7 @@ const path = require('path');
 const EventEmitter = require('events');
 const { Client, Server } = require('node-osc');
 const { extractWorkspaceId } = require('../utils');
+const { DATA_DIR } = require('../dataDir');
 
 // ── Network config (config.json → .env → default) ──────────────────────────────
 const DEFAULT_HOST         = '127.0.0.1';
@@ -419,7 +420,7 @@ async function sendPhotosPathToQLab(showId) {
   if (!photosPathCue) return true;
 
   await ensureConnected();
-  const photosPath = path.join(__dirname, '../photos', String(showId));
+  const photosPath = path.join(DATA_DIR, 'photos', String(showId));
   const addr = cueAddress(photosPathCue, 'notes');
   logOut(`${addr} "${photosPath}"`);
   try {

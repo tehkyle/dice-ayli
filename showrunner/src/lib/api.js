@@ -34,6 +34,12 @@ export const api = {
   listSheets:       ()          => json('GET',    '/api/sheets/list'),
   getSheetTabs:     (id)        => json('GET',    `/api/sheets/${id}/tabs`),
 
+  importHistory: (file) => {
+    const formData = new FormData();
+    formData.append('archive', file);
+    return fetch('/api/shows/import', { method: 'POST', body: formData }).then(r => r.json());
+  },
+
   openPhotoWindow:      (id) => json('POST', `/api/shows/${id}/photo-window/open`),
   closePhotoWindow:     (id) => json('POST', `/api/shows/${id}/photo-window/close`),
   getPhotoWindowStatus: (id) => json('GET',  `/api/shows/${id}/photo-window/status`),

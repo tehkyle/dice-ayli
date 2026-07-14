@@ -9,32 +9,25 @@
     configData.actors.filter(a => !availabilityData.unavailable.has(a.name))
   );
 
-  // DJ requires a unique actor (can't share with anyone, including the Singer).
-  // Singer is a double role and can share with any other track *except* DJ.
-  const DJ_TRACK     = 'Track_DJ';
+  // Singer is a double role and can share with any other single track,
+  // DJ included. No other track may share an actor with anything.
   const SINGER_TRACK = 'Track_Singer';
 
   let filledEntries = $derived(Object.entries(castData.selections).filter(([, actor]) => actor));
 
-  // DJ's dropdown: disable every actor used anywhere, including the Singer's pick.
-  let fullTakenActors = $derived(new Set(filledEntries.map(([, actor]) => actor)));
-  // Regular tracks' dropdowns: disable actors used by other regular tracks or DJ,
-  // but not the Singer's pick alone — that's the one legal pairing.
-  let regularTakenActors = $derived(
+  // Every dropdown except the Singer's disables actors used by any other
+  // non-Singer track — that's the one legal pairing.
+  let takenActors = $derived(
     new Set(filledEntries.filter(([trackId]) => trackId !== SINGER_TRACK).map(([, actor]) => actor))
   );
-  // Singer's dropdown: only DJ's actor is off-limits.
-  let djActor = $derived(castData.selections[DJ_TRACK] || '');
-  let singerTakenActors = $derived(new Set(djActor ? [djActor] : []));
+  let noneTaken = new Set();
 
   function takenActorsFor(trackId) {
-    if (trackId === DJ_TRACK) return fullTakenActors;
-    if (trackId === SINGER_TRACK) return singerTakenActors;
-    return regularTakenActors;
+    return trackId === SINGER_TRACK ? noneTaken : takenActors;
   }
 
-  // A shared actor is only valid when it's exactly {Singer, one non-DJ track}.
-  // Anything else (DJ sharing, or two non-Singer tracks sharing) is a real dupe.
+  // A shared actor is only valid when it's exactly {Singer, one other track}.
+  // Anything else (two non-Singer tracks sharing, or 3+ tracks sharing) is a real dupe.
   let dupeTracks = $derived.by(() => {
     const byActor = {};
     for (const [trackId, actor] of filledEntries) {
@@ -43,9 +36,7 @@
     const bad = new Set();
     for (const trackIds of Object.values(byActor)) {
       if (trackIds.length < 2) continue;
-      const isAllowedPair = trackIds.length === 2
-        && trackIds.includes(SINGER_TRACK)
-        && !trackIds.includes(DJ_TRACK);
+      const isAllowedPair = trackIds.length === 2 && trackIds.includes(SINGER_TRACK);
       if (!isAllowedPair) trackIds.forEach(id => bad.add(id));
     }
     return bad;

@@ -7,6 +7,7 @@ try {
 
 const express = require('express');
 
+const { DATA_DIR } = require('./dataDir');
 const { getDb } = require('./db/database');
 const { startReceiver, setActiveShow } = require('./osc/qlabBridge');
 const showsRouter  = require('./routes/shows');
@@ -23,7 +24,7 @@ const app = express();
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
-app.use('/photos', express.static(path.join(__dirname, 'photos')));
+app.use('/photos', express.static(path.join(DATA_DIR, 'photos')));
 
 app.get('/history', (_req, res) => res.sendFile(path.join(__dirname, 'public/index.html')));
 app.get('/camera',  (_req, res) => res.sendFile(path.join(__dirname, 'public/index.html')));
