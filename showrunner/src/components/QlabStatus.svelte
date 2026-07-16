@@ -2,7 +2,7 @@
   let { reachable = null, missingVars = [], statusText = 'Checking QLab…' } = $props();
 </script>
 
-<div class="qlab-status">
+<div class="qlab-status {reachable === false ? 'offline' : ''}">
   <span class="status-dot {reachable === null ? 'checking' : reachable ? (missingVars.length ? 'warn' : 'ok') : 'offline'}"></span>
   <span>{statusText}</span>
 </div>

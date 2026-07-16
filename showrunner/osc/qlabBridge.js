@@ -617,6 +617,19 @@ function endShow(showId) {
 function createReceiverServer(port) {
   const server = new Server(port, '0.0.0.0');
 
+  // node-osc's Server never listens for its own socket's 'error' event (it only
+  // re-emits errors it generates itself, e.g. decode failures), so a bind failure
+  // like EADDRINUSE would otherwise be an unhandled socket error and crash the
+  // whole process. Catch it here so a port conflict (e.g. a Stream Deck's OSC
+  // listener also defaulting to 53001) is recoverable instead of fatal.
+  server._sock.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      logErr(`Port ${port} is already in use by another app (e.g. a Stream Deck OSC plugin). Change the OSC receive port in Settings and it'll take effect immediately.`);
+    } else {
+      logErr(`Receiver: ${err.message}`);
+    }
+  });
+
   server.on('message', (msg) => {
     const [address, ...args] = msg;
     logIn(`${address} ${args.join(' ')}`);
