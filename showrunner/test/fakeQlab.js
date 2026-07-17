@@ -32,6 +32,7 @@ function startFakeQlab() {
     playbackPositionId: 'CUE-42',
     confirmFired: 0,
     connects: 0,
+    udpReplyPort: null,        // last /udpReplyPort value the bridge told us about
 
     // Simulate QLab's reactive playhead push for a given cue list. Only the
     // main list's move changes what the poll query answers — exactly like QLab,
@@ -58,6 +59,7 @@ function startFakeQlab() {
       return;
     }
     if (address === '/updates') return; // subscription — no reply
+    if (address === '/udpReplyPort') { fake.udpReplyPort = args[0]; return; }
     if (fake.connectMode !== 'ok') return; // unauthenticated: mute all cue replies
 
     if (address.endsWith(`/cue/${config.qlabMainCueList}/uniqueID`)) {

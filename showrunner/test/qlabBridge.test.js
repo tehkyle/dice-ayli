@@ -7,7 +7,7 @@
 // before anything connects successfully.
 const { test, after } = require('node:test');
 const assert = require('node:assert');
-const { startFakeQlab, MAIN_LIST_ID } = require('./fakeQlab'); // sets QLAB_* env — must precede the bridge require
+const { startFakeQlab, MAIN_LIST_ID, RECV_PORT } = require('./fakeQlab'); // sets QLAB_* env — must precede the bridge require
 
 const fake   = startFakeQlab();
 const bridge = require('../osc/qlabBridge.js');
@@ -29,6 +29,7 @@ test('happy path: send, read-back verify, no confirm cue when fireConfirm:false'
   assert.deepStrictEqual(r, { synced: true, mismatches: [], connectStatus: 'ok' });
   assert.strictEqual(fake.notes.Track_1, 'Alice');
   assert.strictEqual(fake.confirmFired, 0);
+  assert.strictEqual(fake.udpReplyPort, RECV_PORT, 'bridge must tell QLab our configured receive port on connect');
 });
 
 test('dropped packet: verify detects it, reconnect+retry recovers, confirm fires', async () => {

@@ -39,6 +39,8 @@ const OSC = {
   connect:    (ws)                 => `/workspace/${ws}/connect`,
   // Global toggle, not workspace-scoped — QLab has no /workspace/{ws}/updates address.
   updates:    ()                   => '/updates',
+  // Not workspace-scoped — QLab tracks the reply port per sender address, not per workspace.
+  udpReplyPort: ()                 => '/udpReplyPort',
   cue:        (ws, id, cmd)        => ws ? `/workspace/${ws}/cue/${id}/${cmd}` : `/cue/${id}/${cmd}`,
   cueById:    (ws, id, prop)       => `/workspace/${ws}/cue_id/${id}/${prop}`,
   panic:      (ws)                 => ws ? `/workspace/${ws}/panic` : '/panic',
@@ -181,6 +183,7 @@ async function doConnect() {
   if (status === 'ok') {
     connected = true;
     log('Connected to QLab workspace');
+    setUdpReplyPort();
     subscribeToUpdates();
     resolveMainCueListId()
       .then(() => queryPlayhead())
@@ -191,6 +194,17 @@ async function doConnect() {
   }
 
   return status;
+}
+
+// Tells QLab which local port to send replies to. QLab tracks this per sender
+// address and defaults to 53001 until told otherwise, so this must be sent on
+// every fresh /connect — not just once at startup — or a non-default receive
+// port configured in Settings silently goes unheard.
+function setUdpReplyPort() {
+  const { receivePort } = resolveNetwork();
+  const addr = OSC.udpReplyPort();
+  logOut(`${addr} ${receivePort}`);
+  oscClient.send(addr, receivePort);
 }
 
 function subscribeToUpdates() {
