@@ -15,10 +15,11 @@ const baseConfig = {
   staticScenes: ['Encore'],
 };
 
-test('header row matches Date/Start/Run/Showrunner + tracks + per-act order+scenes + static scenes', () => {
+test('header row matches Date/Start/Run/Showrunner + tracks + Intro/Dicing + per-act order+scenes + static scenes', () => {
   assert.deepStrictEqual(buildHeaderRow(baseConfig), [
     'Date', 'Start Time', 'Run Time', 'Showrunner',
     'Track 1', 'DJ',
+    'Intro/Dicing',
     'Act 2 Order', '2A', '2B',
     'Act 3 Order', '3A', '3B', '3C',
     'Encore',

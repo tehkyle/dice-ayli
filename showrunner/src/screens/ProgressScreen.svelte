@@ -11,9 +11,9 @@
   import { formatCueDisplay } from '../lib/format.js';
   import ProgressSceneItem from '../components/ProgressSceneItem.svelte';
 
-  let startTime = $state(
-    showData.lockTime
-      ? new Date(showData.lockTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+  let startTimeLabel = $state(
+    showData.startTime
+      ? new Date(showData.startTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
       : new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
   );
   let going = $state(false);
@@ -171,7 +171,7 @@
 
   <div class="progress-meta">
     <span class="progress-perf">{showData.perfLabel}</span>
-    <span class="progress-start">Started {startTime}</span>
+    <span class="progress-start">Started {startTimeLabel}</span>
     {#if !castSyncWarning}
       <span class="progress-qlab-ok">✓ Cast synced to QLab</span>
     {:else}

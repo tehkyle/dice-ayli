@@ -23,7 +23,7 @@ function buildHeaderRow(config) {
     for (const sceneName of act.scenes) sceneHeaders.push(sceneName);
   }
   const staticHeaders = config.staticScenes || [];
-  return ['Date', 'Start Time', 'Run Time', 'Showrunner', ...trackHeaders, ...sceneHeaders, ...staticHeaders];
+  return ['Date', 'Start Time', 'Run Time', 'Showrunner', ...trackHeaders, 'Intro/Dicing', ...sceneHeaders, ...staticHeaders];
 }
 
 function buildAuth() {
@@ -106,13 +106,13 @@ async function appendShowToSheet(show, performanceNumber, castAssignments, scene
   const staticSceneColumns    = (config.staticScenes || []).map(n => durationCell(scenesPlayed.find(e => e.scene_name === n)));
   const staticSceneColumnsTsv = (config.staticScenes || []).map(n => durationCell(scenesPlayed.find(e => e.scene_name === n), { tsv: true }));
 
-  const startTime = show.locked_at
-    ? new Date(show.locked_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  const startTime = show.started_at
+    ? new Date(show.started_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
     : '';
 
   let runTime = '';
-  if (show.locked_at && show.ended_at) {
-    const totalSec = Math.round((new Date(show.ended_at) - new Date(show.locked_at)) / 1000);
+  if (show.started_at && show.ended_at) {
+    const totalSec = Math.round((new Date(show.ended_at) - new Date(show.started_at)) / 1000);
     const h = Math.floor(totalSec / 3600);
     const m = Math.floor((totalSec % 3600) / 60);
     const s = totalSec % 60;
@@ -123,18 +123,26 @@ async function appendShowToSheet(show, performanceNumber, castAssignments, scene
     ? new Date(show.show_date + 'T12:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
     : '';
 
+  // Time from "Begin Show" to the first scene's Go — cast dicing plus any
+  // house/curtain announcements, before the audience sees the first scene.
+  const firstScene = scenesPlayed[0];
+  const introDicingEntry = (show.started_at && firstScene)
+    ? { duration_ms: new Date(firstScene.timestamp) - new Date(show.started_at) }
+    : null;
+
   const row = [
     showDate ? `'${showDate}` : '',
     startTime,
     runTime,
     showrunnerEmail,
     ...castColumns,
+    durationCell(introDicingEntry),
     ...actSceneColumns,
     ...staticSceneColumns,
   ];
 
   // Human-readable TSV for clipboard fallback — no Sheets tricks, durations as m:ss
-  const tsvRow = [showDate, startTime, runTime, showrunnerEmail, ...castColumns, ...actSceneColumnsTsv, ...staticSceneColumnsTsv].join('\t');
+  const tsvRow = [showDate, startTime, runTime, showrunnerEmail, ...castColumns, durationCell(introDicingEntry, { tsv: true }), ...actSceneColumnsTsv, ...staticSceneColumnsTsv].join('\t');
 
   try {
     const expectedHeader = buildHeaderRow(config);
@@ -205,8 +213,9 @@ async function applyColumnFormats(sheets, spreadsheetId, sheetTabName, config) {
     const runTimeCol   = col++;                        // Run Time
     col++;                                             // Showrunner
     col += (config.characterTracks || []).length;      // Cast columns
+    const introDicingCol = col++;                       // Intro/Dicing
 
-    const durationCols = [];
+    const durationCols = [introDicingCol];
     for (const act of (config.acts || [])) {
       col++;                                           // Order column (text)
       for (const _ of act.scenes) durationCols.push(col++);

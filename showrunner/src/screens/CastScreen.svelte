@@ -3,7 +3,25 @@
   import { configData } from '../stores/config.svelte.js';
   import { castData, randomizeCast } from '../stores/cast.svelte.js';
   import { availabilityData } from '../stores/availability.svelte.js';
+  import { showData, resetShow } from '../stores/show.svelte.js';
+  import { settingsData } from '../stores/settings.svelte.js';
+  import { api } from '../lib/api.js';
   import CastRow from '../components/CastRow.svelte';
+
+  // Performance mode (the default) skips the Show Setup screen entirely, so
+  // there's nothing to go "back" to — cancel the show instead, same as
+  // Show Setup's own back button does in rehearsal mode.
+  async function goBack() {
+    if (settingsData.rehearsalMode) {
+      nav.screen = 'scenes';
+      return;
+    }
+    if (showData.id) {
+      try { await api.deleteShow(showData.id); } catch (_) {}
+    }
+    resetShow();
+    nav.screen = 'welcome';
+  }
 
   let availableActors = $derived(
     configData.actors.filter(a => !availabilityData.unavailable.has(a.name))
@@ -48,7 +66,7 @@
 </script>
 
 <div class="screen-inner">
-  <button class="btn-back" onclick={() => { nav.screen = 'scenes'; }}>← Back</button>
+  <button class="btn-back" onclick={goBack}>← Back</button>
   <h2 class="screen-title">Assign Cast</h2>
 
   <div class="cast-rows">

@@ -9,6 +9,7 @@ const archiver = require('archiver');
 const { getDb, nextId } = require('../db/database');
 const { broadcast } = require('./events');
 const { DATA_DIR } = require('../dataDir');
+const { getCameraUrl } = require('../utils');
 
 const PHOTOS_DIR = path.join(DATA_DIR, 'photos');
 const upload = multer({
@@ -29,6 +30,16 @@ const ALLOWED_MIME_EXT = {
 
 function timestampSlug(d = new Date()) {
   return d.toISOString().replace(/[-:]/g, '').slice(0, 15);
+}
+
+// "July 22, 2:17pm" — matches how stage management refers to a performance, unlike the internal show id.
+function showDatetimeLabel(isoString) {
+  const d = isoString ? new Date(isoString) : new Date();
+  const date = d.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+  const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+    .replace(' ', '')
+    .toLowerCase();
+  return `${date}, ${time}`;
 }
 
 function photosForShow(db, showId) {
@@ -96,9 +107,12 @@ router.get('/:show_id/zip', (req, res) => {
   const { photos } = photosForShow(db, showId);
   if (photos.length === 0) return res.status(404).json({ error: 'No photos for this show' });
 
+  const show = db.data.shows.find(s => s.id === showId);
+  const filename = `${showDatetimeLabel(show?.started_at)}.zip`;
+
   res.set({
     'Content-Type': 'application/zip',
-    'Content-Disposition': `attachment; filename="show-${showId}-photos.zip"`,
+    'Content-Disposition': `attachment; filename="${filename}"`,
   });
 
   const archive = archiver('zip');
@@ -108,6 +122,12 @@ router.get('/:show_id/zip', (req, res) => {
     archive.file(path.join(PHOTOS_DIR, String(showId), filename), { name: filename });
   }
   archive.finalize();
+});
+
+// GET /api/photos/camera-url — the standing camera page URL, no show id required.
+// Same QR code works for every performance, so this can be shown before a show exists.
+router.get('/camera-url', (req, res) => {
+  res.json({ camera_url: getCameraUrl() });
 });
 
 // GET /api/photos/active — photos for the currently running performance, if any

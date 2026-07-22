@@ -21,6 +21,8 @@
   import SettingsBadge from './components/SettingsBadge.svelte';
   import PhotoModal from './components/PhotoModal.svelte';
   import PhotoBadge from './components/PhotoBadge.svelte';
+  import CameraQrModal from './components/CameraQrModal.svelte';
+  import CameraQrBadge from './components/CameraQrBadge.svelte';
   import OscMonitorModal from './components/OscMonitorModal.svelte';
   import OscMonitorBadge from './components/OscMonitorBadge.svelte';
 
@@ -57,7 +59,7 @@
 
         showData.id          = active.id;
         showData.perfLabel   = `Performance #${active.performance_number}`;
-        showData.lockTime    = new Date(active.locked_at);
+        showData.startTime   = new Date(active.started_at);
         showData.qlabNotified = true;
 
         for (const { character_track, actor_name } of active.cast) {
@@ -114,11 +116,14 @@
   <div class="global-badges">
     {#if showData.id}
       <PhotoBadge />
+    {:else}
+      <CameraQrBadge />
     {/if}
     <OscMonitorBadge />
     <SettingsBadge />
   </div>
   <PhotoModal />
+  <CameraQrModal />
   <OscMonitorModal />
   <SettingsModal />
 {/if}

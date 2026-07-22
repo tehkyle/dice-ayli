@@ -34,6 +34,17 @@ router.post('/sheets', (req, res) => {
   res.json({ success: true });
 });
 
+// POST /api/config/general — save general app settings (e.g. rehearsal mode)
+router.post('/general', (req, res) => {
+  const body   = req.body || {};
+  const config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
+
+  if ('rehearsalMode' in body) config.rehearsalMode = !!body.rehearsalMode;
+
+  fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf8');
+  res.json({ success: true });
+});
+
 // POST /api/config/qlab — save QLab connection settings (host/ports/workspace/passcode).
 // Every field is optional; empty values fall back to the bridge's built-in defaults.
 router.post('/qlab', (req, res) => {

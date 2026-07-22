@@ -1235,6 +1235,14 @@ body.history-page {
   letter-spacing: 0.06em;
 }
 
+.modal-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
 .modal-select {
   background: var(--surface-2);
   color: var(--text);
@@ -1576,7 +1584,8 @@ body.history-page {
   font-variant-numeric: tabular-nums;
 }
 
-.summary-clipboard {
+.summary-clipboard,
+.summary-photo-gallery {
   text-align: center;
 }
 

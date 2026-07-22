@@ -1,9 +1,42 @@
 <script>
   import { modalState, closeModal } from '../stores/modal.svelte.js';
   import { refreshBadge } from '../stores/sheets.svelte.js';
+  import { settingsData } from '../stores/settings.svelte.js';
   import { api } from '../lib/api.js';
 
-  let tab = $state('sheets'); // 'sheets' | 'qlab'
+  let tab = $state('general'); // 'general' | 'sheets' | 'qlab'
+
+  // ── General tab ──────────────────────────────────────────────────────────
+  let rehearsalMode = $state(false);
+  let generalStatus = $state('');
+  let generalError  = $state(false);
+  let generalSaving = $state(false);
+
+  async function loadGeneralTab() {
+    generalStatus = '';
+    generalError  = false;
+    try {
+      const cfg = await api.getConfig();
+      rehearsalMode = !!cfg.rehearsalMode;
+    } catch {}
+  }
+
+  async function saveGeneral() {
+    generalSaving = true;
+    generalError  = false;
+    generalStatus = 'Saving…';
+    try {
+      await api.saveGeneralConfig({ rehearsalMode });
+      settingsData.rehearsalMode = rehearsalMode;
+      generalStatus = 'Saved!';
+      setTimeout(() => { generalStatus = ''; }, 2500);
+    } catch {
+      generalError  = true;
+      generalStatus = 'Save failed.';
+    } finally {
+      generalSaving = false;
+    }
+  }
 
   // ── Google Sheets tab ────────────────────────────────────────────────────
   let connected    = $state(false);
@@ -197,7 +230,8 @@
 
   $effect(() => {
     if (!modalState.open) return;
-    if (tab === 'sheets') loadSheetsTab();
+    if (tab === 'general') loadGeneralTab();
+    else if (tab === 'sheets') loadSheetsTab();
     else loadQlabTab();
   });
 </script>
@@ -220,13 +254,25 @@
       </div>
 
       <div class="modal-tabs">
+        <button class="modal-tab {tab === 'general' ? 'active' : ''}" onclick={() => tab = 'general'}>General</button>
         <button class="modal-tab {tab === 'sheets' ? 'active' : ''}" onclick={() => tab = 'sheets'}>Google Sheets</button>
         <button class="modal-tab {tab === 'qlab' ? 'active' : ''}" onclick={() => tab = 'qlab'}>QLab Connection</button>
       </div>
 
       <div class="modal-body">
 
-        {#if tab === 'sheets'}
+        {#if tab === 'general'}
+
+          <p class="modal-desc">
+            Performances skip straight to cast assignment. Rehearsal mode brings back the Show
+            Setup screen for marking actors unavailable and picking which scenes are in play.
+          </p>
+          <label class="modal-checkbox-row">
+            <input type="checkbox" bind:checked={rehearsalMode} />
+            Rehearsal mode
+          </label>
+
+        {:else if tab === 'sheets'}
 
           {#if disconnected}
             <p class="modal-desc">Connect your Google account to export show data to a spreadsheet after each performance.</p>
@@ -311,7 +357,12 @@
       </div>
 
       <div class="modal-footer">
-        {#if tab === 'sheets'}
+        {#if tab === 'general'}
+          <button class="btn btn-primary" disabled={generalSaving} onclick={saveGeneral}>Save</button>
+          {#if generalStatus}
+            <span class="modal-save-status {generalError ? 'error' : ''}">{generalStatus}</span>
+          {/if}
+        {:else if tab === 'sheets'}
           {#if connected}
             <button class="btn btn-primary" disabled={sheetsSaveDisabled} onclick={saveSheets}>Save</button>
             {#if sheetsSaveStatus}

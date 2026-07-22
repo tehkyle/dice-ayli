@@ -1,4 +1,5 @@
 {
+  "rehearsalMode": false,
   "qlabHost": "",
   "qlabSendPort": "",
   "qlabReceivePort": "",

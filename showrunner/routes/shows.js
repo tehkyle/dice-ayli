@@ -75,12 +75,18 @@ router.post('/', (req, res) => {
   const { notes } = req.body || {};
 
   const id = nextId(db.data.shows);
-  db.data.shows.push({ id, show_date: today, locked_at: null, notes: notes || null });
+  const started_at = new Date().toISOString();
+  // Ushers and the house are already in the room before cast is diced, so the
+  // upload window opens now rather than waiting for cast lock.
+  db.data.shows.push({
+    id, show_date: today, started_at, locked_at: null, notes: notes || null,
+    photo_window_open: true, photo_window_opened_at: started_at,
+  });
   db.write();
 
   const sorted = [...db.data.shows].sort((a, b) => a.id - b.id);
   const performance_number = sorted.findIndex(s => s.id === id) + 1;
-  res.json({ id, show_date: today, performance_number });
+  res.json({ id, show_date: today, started_at, performance_number });
 });
 
 // POST /api/shows/:id/cast — lock cast + scenes, save, send OSC
@@ -108,13 +114,6 @@ router.post('/:id/cast', async (req, res) => {
   show.scenes        = scenes || null;
   show.scenesOrdered = scenesOrdered || null;
   show.locked_at     = new Date().toISOString();
-
-  // Operators' phones need the upload window open as soon as the show is running,
-  // which is this moment — cast gets assigned minutes into the live show, not before it.
-  if (!show.photo_window_open) {
-    show.photo_window_open      = true;
-    show.photo_window_opened_at = show.locked_at;
-  }
   db.write();
 
   setActiveShow(showId);

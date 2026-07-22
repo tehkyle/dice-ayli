@@ -8,6 +8,7 @@
   import { initScenesFromActs } from '../stores/scenes.svelte.js';
   import { initCastFromTracks } from '../stores/cast.svelte.js';
   import { initAvailability } from '../stores/availability.svelte.js';
+  import { settingsData, loadGeneralSettings } from '../stores/settings.svelte.js';
   import QlabStatus from '../components/QlabStatus.svelte';
 
   const today = toIsoDate();
@@ -59,15 +60,17 @@
       const data = await api.createShow();
       showData.id = data.id;
       showData.perfLabel = `Performance #${data.performance_number}`;
+      showData.startTime = new Date(data.started_at);
 
       await loadConfig();
+      await loadGeneralSettings();
 
       const { characterTracks, acts } = await import('../stores/config.svelte.js').then(m => m.configData);
       initScenesFromActs(acts);
       initCastFromTracks(characterTracks);
       initAvailability();
 
-      nav.screen = 'scenes';
+      nav.screen = settingsData.rehearsalMode ? 'scenes' : 'cast';
     } catch {
       alert('Failed to start show. Server may be unreachable.');
       beginDisabled = false;

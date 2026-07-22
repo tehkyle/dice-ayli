@@ -1,7 +1,7 @@
 export const showData = $state({
   id: null,
   perfLabel: 'Performance #—',
-  lockTime: null,
+  startTime: null,
   qlabNotified: false,
   castMismatches: [],
 });
@@ -9,7 +9,7 @@ export const showData = $state({
 export function resetShow() {
   showData.id = null;
   showData.perfLabel = 'Performance #—';
-  showData.lockTime = null;
+  showData.startTime = null;
   showData.qlabNotified = false;
   showData.castMismatches = [];
 }

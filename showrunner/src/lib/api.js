@@ -32,6 +32,7 @@ export const api = {
   getSheetsConfig:  ()          => json('GET',    '/api/config/sheets'),
   saveSheetsConfig: (body)      => json('POST',   '/api/config/sheets', body),
   saveQlabConfig:   (body)      => json('POST',   '/api/config/qlab', body),
+  saveGeneralConfig: (body)     => json('POST',   '/api/config/general', body),
   listSheets:       ()          => json('GET',    '/api/sheets/list'),
   getSheetTabs:     (id)        => json('GET',    `/api/sheets/${id}/tabs`),
 
@@ -46,4 +47,5 @@ export const api = {
   getPhotoWindowStatus: (id) => json('GET',  `/api/shows/${id}/photo-window/status`),
   getPhotos:            (id) => json('GET',  `/api/photos/${id}`),
   deletePhoto:          (id, filename) => json('DELETE', `/api/photos/${id}/${encodeURIComponent(filename)}`),
+  getCameraUrl:         ()   => json('GET',  '/api/photos/camera-url'),
 };

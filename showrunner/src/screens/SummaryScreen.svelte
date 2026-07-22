@@ -9,14 +9,24 @@
   import { getSocket } from '../lib/socket.js';
   import { formatDate, formatDuration, formatDurationReport, toIsoDate } from '../lib/format.js';
   import CastSummaryRow from '../components/CastSummaryRow.svelte';
+  import HistoryGalleryModal from '../components/HistoryGalleryModal.svelte';
+  import { openHistoryGallery } from '../stores/historyGallery.svelte.js';
 
   const today = toIsoDate();
 
   let showLength = $derived.by(() => {
     const last = progressData.scenesPlayed[progressData.scenesPlayed.length - 1];
-    if (!showData.lockTime || !last?.duration) return '—';
+    if (!showData.startTime || !last?.duration) return '—';
     const endMs = new Date(last.time).getTime() + (last.duration ?? 0);
-    return formatDuration(endMs - new Date(showData.lockTime).getTime());
+    return formatDuration(endMs - new Date(showData.startTime).getTime());
+  });
+
+  // Time from "Begin Show" to the first scene's Go — cast dicing plus any
+  // house/curtain announcements, before the audience sees scene 1.1.
+  let introDicingLength = $derived.by(() => {
+    const first = progressData.scenesPlayed[0];
+    if (!showData.startTime || !first) return '—';
+    return formatDuration(new Date(first.time).getTime() - new Date(showData.startTime).getTime());
   });
 
   let spreadsheetId = $state(null);
@@ -29,15 +39,15 @@
     const sceneMap = Object.fromEntries(progressData.scenesPlayed.map(e => [e.scene, e]));
 
     const date  = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-    const start = showData.lockTime
-      ? new Date(showData.lockTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    const start = showData.startTime
+      ? new Date(showData.startTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
       : '';
 
     const last = progressData.scenesPlayed[progressData.scenesPlayed.length - 1];
     let run = '';
-    if (showData.lockTime && last) {
+    if (showData.startTime && last) {
       const endMs    = new Date(last.time).getTime() + (last.duration ?? 0);
-      const totalSec = Math.round((endMs - new Date(showData.lockTime).getTime()) / 1000);
+      const totalSec = Math.round((endMs - new Date(showData.startTime).getTime()) / 1000);
       const h = Math.floor(totalSec / 3600);
       const m = Math.floor((totalSec % 3600) / 60);
       const s = totalSec % 60;
@@ -45,6 +55,12 @@
     }
 
     const castCols  = configData.characterTracks.map(t => castData.selections[t.id] || '');
+
+    const first = progressData.scenesPlayed[0];
+    const introDicing = (showData.startTime && first)
+      ? formatDurationReport(new Date(first.time).getTime() - new Date(showData.startTime).getTime())
+      : '';
+
     const sceneCols = [];
     for (const act of configData.acts) {
       const actEntries = progressData.scenesPlayed.filter(e => act.scenes.includes(e.scene));
@@ -59,7 +75,7 @@
       return entry?.duration ? formatDurationReport(entry.duration) : '';
     });
 
-    return [date, start, run, ...castCols, ...sceneCols, ...staticCols].join('\t');
+    return [date, start, run, ...castCols, introDicing, ...sceneCols, ...staticCols].join('\t');
   });
 
   onMount(async () => {
@@ -104,6 +120,10 @@
     <div class="summary-stat">
       <span class="summary-stat-label">Date</span>
       <span class="summary-stat-value">{formatDate(today)}</span>
+    </div>
+    <div class="summary-stat">
+      <span class="summary-stat-label">Intro / Dicing</span>
+      <span class="summary-stat-value">{introDicingLength}</span>
     </div>
     <div class="summary-stat">
       <span class="summary-stat-label">Show Length</span>
@@ -165,7 +185,15 @@
     </button>
   </div>
 
+  <div class="summary-photo-gallery">
+    <button class="btn btn-secondary" onclick={() => openHistoryGallery(showData.id)}>
+      Photo Gallery
+    </button>
+  </div>
+
   <div class="screen-actions">
     <button class="btn btn-primary btn-xl" onclick={startNewShow}>Start New Show</button>
   </div>
 </div>
+
+<HistoryGalleryModal />
