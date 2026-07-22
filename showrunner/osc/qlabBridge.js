@@ -1,21 +1,26 @@
 const fs   = require('fs');
 const path = require('path');
 const EventEmitter = require('events');
-const { Client, Server } = require('node-osc');
+const { QLabTcpConnection, QLabTcpListener } = require('./tcpTransport');
 const { extractWorkspaceId } = require('../utils');
 const { DATA_DIR } = require('../dataDir');
 
 // ── Network config (config.json → .env → default) ──────────────────────────────
-const DEFAULT_HOST         = '127.0.0.1';
-const DEFAULT_SEND_PORT    = 53000;
-const DEFAULT_RECEIVE_PORT = 53001;
+const DEFAULT_HOST      = '127.0.0.1';
+const DEFAULT_PORT      = 53000;
+// IANA's dynamic/private range (49152–65535) — never assigned to a named
+// service, so nothing else defaults here. Deliberately not 53001: that's
+// the port a naive OSC client (e.g. the QLab Stream Deck plugin) hardcodes
+// for itself — irrelevant to this port's actual purpose (see cueReceiver
+// below), but no reason to invite confusion by reusing it.
+const DEFAULT_CUE_PORT  = 53100;
 
 function resolveNetwork() {
-  const { qlabHost, qlabSendPort, qlabReceivePort } = loadConfig();
+  const { qlabHost, qlabSendPort, qlabCuePort } = loadConfig();
   return {
-    host:        (qlabHost || '').trim() || process.env.QLAB_HOST || DEFAULT_HOST,
-    sendPort:    parseInt(qlabSendPort, 10)    || parseInt(process.env.QLAB_SEND_PORT, 10)    || DEFAULT_SEND_PORT,
-    receivePort: parseInt(qlabReceivePort, 10) || parseInt(process.env.QLAB_RECEIVE_PORT, 10) || DEFAULT_RECEIVE_PORT,
+    host:    (qlabHost || '').trim() || process.env.QLAB_HOST || DEFAULT_HOST,
+    port:    parseInt(qlabSendPort, 10) || parseInt(process.env.QLAB_PORT, 10)     || DEFAULT_PORT,
+    cuePort: parseInt(qlabCuePort, 10)  || parseInt(process.env.QLAB_CUE_PORT, 10) || DEFAULT_CUE_PORT,
   };
 }
 
@@ -39,8 +44,6 @@ const OSC = {
   connect:    (ws)                 => `/workspace/${ws}/connect`,
   // Global toggle, not workspace-scoped — QLab has no /workspace/{ws}/updates address.
   updates:    ()                   => '/updates',
-  // Not workspace-scoped — QLab tracks the reply port per sender address, not per workspace.
-  udpReplyPort: ()                 => '/udpReplyPort',
   cue:        (ws, id, cmd)        => ws ? `/workspace/${ws}/cue/${id}/${cmd}` : `/cue/${id}/${cmd}`,
   cueById:    (ws, id, prop)       => `/workspace/${ws}/cue_id/${id}/${prop}`,
   panic:      (ws)                 => ws ? `/workspace/${ws}/panic` : '/panic',
@@ -51,12 +54,33 @@ const OSC = {
 const replyBus = new EventEmitter();
 replyBus.setMaxListeners(20);
 
-// Single persistent UDP client — never closed between sends.
-// Creating+closing per-send races the async UDP write and drops packets.
-// node-osc's Client reads .host/.port live on every send, so reconfiguring
-// is just mutating these fields — no socket recreation needed.
+// Single persistent TCP connection — replies arrive on the same socket that
+// sent the request, so unlike UDP there's no reply-port to negotiate and no
+// separate local listener that can collide with another app's OSC client.
 const initialNetwork = resolveNetwork();
-const oscClient = new Client(initialNetwork.host, initialNetwork.sendPort);
+const oscClient = new QLabTcpConnection(initialNetwork.host, initialNetwork.port);
+oscClient.on('message', handleIncomingMessage);
+oscClient.on('send', (address, args) => recordOsc('out', address, args));
+oscClient.on('rawData', (chunk) => recordOsc('in', '(raw)', [], { raw: chunk.toString('hex') }));
+oscClient.on('decodeError', (frame, err) =>
+  recordOsc('in', '(undecodable)', [], { raw: frame.toString('hex'), error: err.message }));
+
+// A TCP listener for QLab's own outbound pushes — a Network Cue firing
+// /show/scene_started, /show/end, etc. QLab is the client on this channel,
+// dialing in to us; this app is the server. (Opposite of oscClient above,
+// where this app dials QLab.) Created lazily by startReceiver(), not here —
+// see oscClient's lazy-connect reasoning; the same applies to binding a
+// socket eagerly at module load.
+const cueReceiver = new QLabTcpListener(initialNetwork.cuePort);
+cueReceiver.on('message', handleIncomingMessage);
+cueReceiver.on('error', (err) => logErr(err.message));
+cueReceiver.on('connection', (addr) => log(`Cue port: connection from ${addr}`));
+cueReceiver.on('disconnect', (addr) => log(`Cue port: ${addr} disconnected`));
+// The only way to see what a misconfigured Network Cue patch actually put
+// on the wire instead of just "nothing happened".
+cueReceiver.on('rawData', (chunk) => recordOsc('in', '(raw)', [], { raw: chunk.toString('hex') }));
+cueReceiver.on('decodeError', (frame, err) =>
+  recordOsc('in', '(undecodable)', [], { raw: frame.toString('hex'), error: err.message }));
 
 let workspaceId        = null;
 let mainCueListId      = null;
@@ -64,7 +88,6 @@ let connected          = false;
 let activeShowId       = null;
 let lastKnownCueNumber = null;
 let currentPlayhead    = { cueNumber: '', cueName: '' };
-let receiverServer     = null;
 let playheadPollTimer  = null;
 
 let _db = null;
@@ -170,20 +193,24 @@ async function doConnect() {
   else oscClient.send(addr);
 
   const reply = await replyPromise;
-  // QLab reports a rejected/missing passcode inside data ("badpass") while the
-  // envelope status is still "ok" — trusting status alone would mark a session
-  // connected that QLab will deny every write on.
+  // QLab reports a rejected/missing passcode ("badpass") or other rejections
+  // ("error", seen in the wild — QLab's own docs don't enumerate every value)
+  // inside data, while the envelope status is still "ok" — trusting status
+  // alone would mark a session connected that QLab will deny every write on.
+  // Surface data's actual value rather than collapsing every non-ok case into
+  // "badpass": that string drives a specific "check your passcode" UI hint
+  // (ConfirmScreen.svelte) that would be actively misleading for a rejection
+  // that has nothing to do with the passcode.
   let status;
   if (!reply)                        status = 'timeout';
   else if (reply.status !== 'ok')    status = reply.status ?? 'unknown';
   else if (reply.data === undefined || String(reply.data).startsWith('ok')) status = 'ok';
-  else                               status = 'badpass';
+  else                               status = String(reply.data);
   lastConnectStatus = status;
 
   if (status === 'ok') {
     connected = true;
     log('Connected to QLab workspace');
-    setUdpReplyPort();
     subscribeToUpdates();
     resolveMainCueListId()
       .then(() => queryPlayhead())
@@ -194,17 +221,6 @@ async function doConnect() {
   }
 
   return status;
-}
-
-// Tells QLab which local port to send replies to. QLab tracks this per sender
-// address and defaults to 53001 until told otherwise, so this must be sent on
-// every fresh /connect — not just once at startup — or a non-default receive
-// port configured in Settings silently goes unheard.
-function setUdpReplyPort() {
-  const { receivePort } = resolveNetwork();
-  const addr = OSC.udpReplyPort();
-  logOut(`${addr} ${receivePort}`);
-  oscClient.send(addr, receivePort);
 }
 
 function subscribeToUpdates() {
@@ -626,128 +642,123 @@ function endShow(showId) {
   }
 }
 
+// ── OSC traffic log (for the in-app OSC monitor) ────────────────────────────────
+// A bounded ring buffer, not a growing array — this runs for an entire show,
+// and the monitor only ever needs recent history plus whatever streams in
+// live over SSE while it's open.
+const OSC_LOG_MAX = 500;
+const oscLog = [];
+
+function recordOsc(direction, address, args, extra) {
+  const entry = { time: ts(), direction, address, args, ...extra };
+  oscLog.push(entry);
+  if (oscLog.length > OSC_LOG_MAX) oscLog.shift();
+  if (_broadcast) _broadcast('osc_log', entry);
+}
+
+function getOscLog() {
+  return oscLog;
+}
+
 // ── OSC receiver ───────────────────────────────────────────────────────────────
+// Wired to both oscClient's and cueReceiver's 'message' events (see the
+// connection setup above) — replies arrive on the former, QLab's own pushed
+// cues on the latter, but from here on they're handled identically.
 
-function createReceiverServer(port) {
-  const server = new Server(port, '0.0.0.0');
+function handleIncomingMessage(msg) {
+  const [address, ...args] = msg;
+  logIn(`${address} ${args.join(' ')}`);
+  recordOsc('in', address, args);
 
-  // node-osc's Server never listens for its own socket's 'error' event (it only
-  // re-emits errors it generates itself, e.g. decode failures), so a bind failure
-  // like EADDRINUSE would otherwise be an unhandled socket error and crash the
-  // whole process. Catch it here so a port conflict (e.g. a Stream Deck's OSC
-  // listener also defaulting to 53001) is recoverable instead of fatal.
-  server._sock.on('error', (err) => {
-    if (err.code === 'EADDRINUSE') {
-      logErr(`Port ${port} is already in use by another app (e.g. a Stream Deck OSC plugin). Change the OSC receive port in Settings and it'll take effect immediately.`);
-    } else {
-      logErr(`Receiver: ${err.message}`);
-    }
-  });
-
-  server.on('message', (msg) => {
-    const [address, ...args] = msg;
-    logIn(`${address} ${args.join(' ')}`);
-
-    if (address.startsWith('/reply/')) {
-      // Opportunistically grab workspace ID from any reply before we've discovered it
-      if (!workspaceId) {
-        try {
-          const body = JSON.parse(args[0]);
-          const found = extractWorkspaceId(body);
-          if (found) {
-            workspaceId = found;
-            log(`Workspace: ${workspaceId}`);
-          }
-        } catch { /* not a JSON reply — ignore */ }
-      }
-
+  if (address.startsWith('/reply/')) {
+    // Opportunistically grab workspace ID from any reply before we've discovered it
+    if (!workspaceId) {
       try {
         const body = JSON.parse(args[0]);
-        // QLab also replies 'denied' for things like "no cue with that number" on
-        // /cue/{id}/* queries — not just a stale session. Forcing a reconnect here
-        // is harmless either way (idempotent), but don't read 'denied' as proof the
-        // session itself was the problem.
-        if (body?.status === 'denied') {
-          connected     = false;
-          workspaceId   = null;
-          mainCueListId = null;
-          log('Session denied by QLab — will reconnect on next send');
-          reconnectQLab().catch(() => {});
-        } else if (body?.status === 'error' && address.includes('/cue/')) {
-          connected = false;
+        const found = extractWorkspaceId(body);
+        if (found) {
+          workspaceId = found;
+          log(`Workspace: ${workspaceId}`);
         }
       } catch { /* not a JSON reply — ignore */ }
-
-      replyBus.emit('reply', address, args);
-      return;
     }
 
-    if (address.includes('/playbackPosition')) {
-      // Pushes arrive per cue list (/update/.../cueList/{listId}/playbackPosition)
-      // — ignore every list except the configured main one. If either ID is
-      // still unknown, let the push through rather than showing no playhead.
-      const pushListId = address.match(/\/cueList\/([^/]+)\//)?.[1];
-      if (pushListId && mainCueListId && pushListId !== mainCueListId) return;
-      const cueId = args[0];
-      if (cueId) updatePlayhead(cueId);
-      return;
-    }
-
-    if (address === '/show/scene_started') {
-      const sceneName = args[0];
-      if (!sceneName) return;
-      try {
-        const { nextId } = require('../db/database');
-        _db.data.scene_log.push({
-          id:         nextId(_db.data.scene_log),
-          show_id:    activeShowId,
-          scene_name: sceneName,
-          position:   null,
-          timestamp:  new Date().toISOString(),
-        });
-        _db.write();
-      } catch (err) {
-        logErr(`scene_log insert failed: ${err.message}`);
+    try {
+      const body = JSON.parse(args[0]);
+      // QLab also replies 'denied' for things like "no cue with that number" on
+      // /cue/{id}/* queries — not just a stale session. Forcing a reconnect here
+      // is harmless either way (idempotent), but don't read 'denied' as proof the
+      // session itself was the problem.
+      if (body?.status === 'denied') {
+        connected     = false;
+        workspaceId   = null;
+        mainCueListId = null;
+        log('Session denied by QLab — will reconnect on next send');
+        reconnectQLab().catch(() => {});
+      } else if (body?.status === 'error' && address.includes('/cue/')) {
+        connected = false;
       }
-      if (_broadcast) _broadcast('scene_started', { scene: sceneName, time: ts() });
-      return;
+    } catch { /* not a JSON reply — ignore */ }
+
+    replyBus.emit('reply', address, args);
+    return;
+  }
+
+  if (address.includes('/playbackPosition')) {
+    // Pushes arrive per cue list (/update/.../cueList/{listId}/playbackPosition)
+    // — ignore every list except the configured main one. If either ID is
+    // still unknown, let the push through rather than showing no playhead.
+    const pushListId = address.match(/\/cueList\/([^/]+)\//)?.[1];
+    if (pushListId && mainCueListId && pushListId !== mainCueListId) return;
+    const cueId = args[0];
+    if (cueId) updatePlayhead(cueId);
+    return;
+  }
+
+  if (address === '/show/scene_started') {
+    const sceneName = args[0];
+    if (!sceneName) return;
+    try {
+      const { nextId } = require('../db/database');
+      _db.data.scene_log.push({
+        id:         nextId(_db.data.scene_log),
+        show_id:    activeShowId,
+        scene_name: sceneName,
+        position:   null,
+        timestamp:  new Date().toISOString(),
+      });
+      _db.write();
+    } catch (err) {
+      logErr(`scene_log insert failed: ${err.message}`);
     }
+    if (_broadcast) _broadcast('scene_started', { scene: sceneName, time: ts() });
+    return;
+  }
 
-    if (address === '/show/end') {
-      log(`Show end received for show ${activeShowId}`);
-      endShow(activeShowId);
-    }
-  });
-
-  server.on('error', (err) => logErr(`Receiver: ${err.message}`));
-
-  log(`Receiver listening on UDP port ${port}`);
-  return server;
+  if (address === '/show/end') {
+    log(`Show end received for show ${activeShowId}`);
+    endShow(activeShowId);
+  }
 }
 
 function startReceiver(db, broadcast) {
   _db = db;
   _broadcast = broadcast;
-  receiverServer = createReceiverServer(resolveNetwork().receivePort);
-  return receiverServer;
+  oscClient.connect();
+  cueReceiver.start();
 }
 
-// Re-reads config.json and applies host/port changes to the live client/receiver.
+// Re-reads config.json and applies host/port changes to the live connections.
 // Always drops the current session so the next send re-discovers/re-connects —
 // this is also what makes a workspace-name/passcode-only change take effect.
 function applyNetworkConfig() {
-  const { host, sendPort, receivePort } = resolveNetwork();
-  oscClient.host = host;
-  oscClient.port = sendPort;
-  connected      = false;
-  workspaceId    = null;
-  mainCueListId  = null;
-
-  if (receiverServer && receiverServer.port !== receivePort) {
-    receiverServer.close();
-    receiverServer = createReceiverServer(receivePort);
-  }
-  log(`Network config applied: ${host}:${sendPort} (recv ${receivePort})`);
+  const { host, port, cuePort } = resolveNetwork();
+  connected     = false;
+  workspaceId   = null;
+  mainCueListId = null;
+  oscClient.setTarget(host, port);
+  cueReceiver.setPort(cuePort);
+  log(`Network config applied: ${host}:${port} (cue port ${cuePort})`);
 }
 
 module.exports = {
@@ -757,6 +768,7 @@ module.exports = {
   setActiveShow,
   endShow,
   getPlayhead,
+  getOscLog,
   sendCastToQLab,
   sendScenesToQLab,
   sendPhotosPathToQLab,

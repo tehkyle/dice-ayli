@@ -43,7 +43,7 @@ router.post('/qlab', (req, res) => {
   for (const key of ['qlabHost', 'qlabWorkspace', 'qlabPasscode']) {
     if (key in body) config[key] = String(body[key] ?? '').trim();
   }
-  for (const key of ['qlabSendPort', 'qlabReceivePort']) {
+  for (const key of ['qlabSendPort', 'qlabCuePort']) {
     if (key in body) {
       const port = parseInt(body[key], 10);
       config[key] = (port >= 1 && port <= 65535) ? port : '';

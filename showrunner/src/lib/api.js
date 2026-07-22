@@ -19,6 +19,7 @@ export const api = {
 
   getQlabStatus:    ()          => json('GET',    '/api/qlab/status'),
   getPlayhead:      ()          => json('GET',    '/api/qlab/playhead'),
+  getOscLog:        ()          => json('GET',    '/api/qlab/osc-log'),
   postGo:           ()          => json('POST',   '/api/qlab/go'),
   panicAll:         ()          => json('POST',   '/api/qlab/panic'),
   reconnectQLab:    (body)      => json('POST',   '/api/qlab/reconnect', body ?? {}),
