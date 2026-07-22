@@ -4,6 +4,7 @@
   "qlabReceivePort": "",
   "qlabPasscode": "5436",
   "qlabWorkspace": "ayli",
+  "qlabCuePort": 53100,
   "qlabMainCueList": "MAIN",
   "castConfirmedCue": "CAST_CONFIRMED",
   "photosPathCue": "PHOTOS_PATH",

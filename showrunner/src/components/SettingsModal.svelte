@@ -144,7 +144,7 @@
   // ── QLab tab ─────────────────────────────────────────────────────────────
   let qlabHost          = $state('');
   let qlabSendPort      = $state('');
-  let qlabReceivePort   = $state('');
+  let qlabCuePort       = $state('');
   let qlabWorkspace = $state('');
   let qlabPasscode  = $state('');
 
@@ -159,7 +159,7 @@
       const cfg = await api.getConfig();
       qlabHost          = cfg.qlabHost ?? '';
       qlabSendPort      = cfg.qlabSendPort ?? '';
-      qlabReceivePort   = cfg.qlabReceivePort ?? '';
+      qlabCuePort       = cfg.qlabCuePort ?? '';
       qlabWorkspace     = cfg.qlabWorkspace ?? '';
       qlabPasscode      = cfg.qlabPasscode ?? '';
     } catch {}
@@ -171,7 +171,7 @@
     qlabStatus = 'Saving…';
     try {
       await api.saveQlabConfig({
-        qlabHost, qlabSendPort, qlabReceivePort,
+        qlabHost, qlabSendPort, qlabCuePort,
         qlabWorkspace, qlabPasscode,
       });
       qlabStatus = 'Reconnecting…';
@@ -290,12 +290,12 @@
             <input id="qlab-host" class="modal-input" type="text" placeholder="127.0.0.1" bind:value={qlabHost} />
           </div>
           <div class="modal-field">
-            <label class="modal-label" for="qlab-send-port">Send Port</label>
+            <label class="modal-label" for="qlab-send-port">Port</label>
             <input id="qlab-send-port" class="modal-input" type="number" placeholder="53000" bind:value={qlabSendPort} />
           </div>
           <div class="modal-field">
-            <label class="modal-label" for="qlab-recv-port">Receive Port</label>
-            <input id="qlab-recv-port" class="modal-input" type="number" placeholder="53001" bind:value={qlabReceivePort} />
+            <label class="modal-label" for="qlab-cue-port">Cue Port (must match QLab's Network Cue patch)</label>
+            <input id="qlab-cue-port" class="modal-input" type="number" placeholder="53100" bind:value={qlabCuePort} />
           </div>
           <div class="modal-field">
             <label class="modal-label" for="qlab-ws">Workspace (name or ID)</label>

@@ -7,11 +7,13 @@
 // before anything connects successfully.
 const { test, after } = require('node:test');
 const assert = require('node:assert');
-const { startFakeQlab, MAIN_LIST_ID, RECV_PORT } = require('./fakeQlab'); // sets QLAB_* env — must precede the bridge require
+const { startFakeQlab, MAIN_LIST_ID } = require('./fakeQlab'); // sets QLAB_* env — must precede the bridge require
 
 const fake   = startFakeQlab();
 const bridge = require('../osc/qlabBridge.js');
-bridge.startReceiver({ data: { shows: [], scene_log: [], cast_assignments: [] }, write() {} }, null);
+const db = { data: { shows: [], scene_log: [], cast_assignments: [] }, write() {} };
+const broadcasts = [];
+bridge.startReceiver(db, (event, payload) => broadcasts.push({ event, payload }));
 
 const settle = (ms = 300) => new Promise(res => setTimeout(res, ms));
 
@@ -29,7 +31,6 @@ test('happy path: send, read-back verify, no confirm cue when fireConfirm:false'
   assert.deepStrictEqual(r, { synced: true, mismatches: [], connectStatus: 'ok' });
   assert.strictEqual(fake.notes.Track_1, 'Alice');
   assert.strictEqual(fake.confirmFired, 0);
-  assert.strictEqual(fake.udpReplyPort, RECV_PORT, 'bridge must tell QLab our configured receive port on connect');
 });
 
 test('dropped packet: verify detects it, reconnect+retry recovers, confirm fires', async () => {
@@ -41,7 +42,7 @@ test('dropped packet: verify detects it, reconnect+retry recovers, confirm fires
   assert.strictEqual(r.synced, true, JSON.stringify(r));
   assert.strictEqual(fake.notes.Track_2, 'Dave');
   assert.ok(fake.connects > connectsBefore, 'retry should reconnect first');
-  await settle(); // confirm-cue send is fire-and-forget UDP
+  await settle(); // confirm-cue send is fire-and-forget, no reply awaited
   assert.strictEqual(fake.confirmFired, 1, 'confirm fires after clean verify');
 });
 
@@ -71,6 +72,20 @@ test('playhead tracks only the main cue list', async () => {
   fake.pushPlayhead(MAIN_LIST_ID, 'CUE-99');
   await settle();
   assert.strictEqual(bridge.getPlayhead().cueNumber, '99', 'main-list push should move playhead');
+});
+
+test('QLab pushing a Network cue (scene_started) lands on the listener, not the reply connection', async () => {
+  const logCountBefore = db.data.scene_log.length;
+
+  fake.pushToApp('/show/scene_started', '2E');
+  await settle();
+
+  assert.strictEqual(db.data.scene_log.length, logCountBefore + 1);
+  assert.strictEqual(db.data.scene_log.at(-1).scene_name, '2E');
+  assert.ok(
+    broadcasts.some(b => b.event === 'scene_started' && b.payload.scene === '2E'),
+    'operator UI must be notified of the scene start'
+  );
 });
 
 // The bridge has no shutdown API (the server never stops it) — its poll timer

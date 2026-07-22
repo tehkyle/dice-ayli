@@ -21,6 +21,8 @@
   import SettingsBadge from './components/SettingsBadge.svelte';
   import PhotoModal from './components/PhotoModal.svelte';
   import PhotoBadge from './components/PhotoBadge.svelte';
+  import OscMonitorModal from './components/OscMonitorModal.svelte';
+  import OscMonitorBadge from './components/OscMonitorBadge.svelte';
 
   let appVersion = $state('');
 
@@ -113,9 +115,11 @@
     {#if showData.id}
       <PhotoBadge />
     {/if}
+    <OscMonitorBadge />
     <SettingsBadge />
   </div>
   <PhotoModal />
+  <OscMonitorModal />
   <SettingsModal />
 {/if}
 

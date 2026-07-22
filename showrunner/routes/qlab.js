@@ -3,7 +3,7 @@ const router  = express.Router();
 const path    = require('path');
 const fs      = require('fs');
 
-const { checkQLab, sendGo, sendPanicAll, reconnectQLab, getPlayhead, sendCastToQLab } = require('../osc/qlabBridge');
+const { checkQLab, sendGo, sendPanicAll, reconnectQLab, getPlayhead, getOscLog, sendCastToQLab } = require('../osc/qlabBridge');
 
 // GET /api/qlab/status
 router.get('/status', async (req, res) => {
@@ -22,6 +22,13 @@ router.get('/status', async (req, res) => {
 // Updated reactively via QLab's /updates subscription in qlabBridge.js.
 router.get('/playhead', (req, res) => {
   res.json(getPlayhead());
+});
+
+// GET /api/qlab/osc-log — recent OSC traffic (both directions) for the OSC
+// monitor. Live updates stream over SSE ('osc_log' events) once open; this
+// is just the history from before the monitor was opened.
+router.get('/osc-log', (req, res) => {
+  res.json(getOscLog());
 });
 
 // POST /api/qlab/sync-cast — send cast notes to QLab and verify by reading

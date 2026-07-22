@@ -1,28 +1,42 @@
-// In-process stand-in for QLab's OSC interface, listening on alternate ports so
-// real QLab and a running app instance stay untouched. config.json leaves the
-// ports empty, so pointing the bridge here is just setting the env vars below
-// BEFORE requiring osc/qlabBridge.js.
+// In-process stand-in for QLab's OSC-over-TCP interface, listening on an
+// alternate port so real QLab and a running app instance stay untouched.
+// config.json leaves qlabSendPort empty, so pointing the bridge here is just
+// setting the env var below BEFORE requiring osc/qlabBridge.js.
 //
 // It implements only what the bridge speaks: /connect, notes get/set, the
 // confirm-cue start, and the main-cue-list playhead queries. Reply shapes match
 // live QLab 5 behavior, including the quirks the bridge works around (set
 // echoes carry no data field; a bad passcode is status:"ok" + data:"badpass").
 const path = require('path');
-const { Client, Server } = require('node-osc');
+const net  = require('net');
+const { toBuffer, fromBuffer } = require('osc-min');
+const { Message } = require('node-osc');
+const { encode: slipEncode, SlipDecoder } = require('../osc/slip');
 
-const SEND_PORT = 63000;
-const RECV_PORT = 63001;
+const PORT = 63000;
+// A separate port because it's a separate socket in the real bridge too: QLab
+// dials in to push Network Cue events (/show/scene_started, etc.) rather
+// than reusing the connection the bridge dials out on for commands/replies.
+// This fake plays the QLab role for both — for the cue push, that means
+// dialing OUT to the bridge's listener, same SLIP+OSC framing as the main
+// connection.
+const CUE_PORT = 63002;
 const MAIN_LIST_ID = 'LIST-MAIN-ID';
 
 const config = require(path.join(__dirname, '../config.json'));
 
-process.env.QLAB_HOST         = '127.0.0.1';
-process.env.QLAB_SEND_PORT    = String(SEND_PORT);
-process.env.QLAB_RECEIVE_PORT = String(RECV_PORT);
+process.env.QLAB_HOST = '127.0.0.1';
+process.env.QLAB_PORT = String(PORT);
+process.env.QLAB_CUE_PORT = String(CUE_PORT);
 
 function startFakeQlab() {
-  const reply  = new Client('127.0.0.1', RECV_PORT);
-  const server = new Server(SEND_PORT, '0.0.0.0');
+  const sockets = new Set();
+
+  function writeMessage(sock, address, args) {
+    const message = new Message(address);
+    for (const arg of args) message.append(arg);
+    sock.write(slipEncode(toBuffer(message)));
+  }
 
   const fake = {
     notes: {},                 // cueId → notes value
@@ -32,24 +46,34 @@ function startFakeQlab() {
     playbackPositionId: 'CUE-42',
     confirmFired: 0,
     connects: 0,
-    udpReplyPort: null,        // last /udpReplyPort value the bridge told us about
 
     // Simulate QLab's reactive playhead push for a given cue list. Only the
     // main list's move changes what the poll query answers — exactly like QLab,
     // where each cue list keeps its own playback position.
     pushPlayhead(listId, cueId) {
       if (listId === MAIN_LIST_ID) fake.playbackPositionId = cueId;
-      reply.send(`/update/workspace/test/cueList/${listId}/playbackPosition`, cueId);
+      for (const sock of sockets) {
+        writeMessage(sock, `/update/workspace/test/cueList/${listId}/playbackPosition`, [cueId]);
+      }
+    },
+
+    // Simulates a QLab Network Cue firing — a fresh outbound TCP connection
+    // to the bridge's cue-port listener, same as real QLab dialing in.
+    pushToApp(address, ...args) {
+      const client = net.createConnection({ host: '127.0.0.1', port: CUE_PORT }, () => {
+        writeMessage(client, address, args);
+        client.end();
+      });
     },
 
     close() {
-      try { reply.close(); } catch {}
-      try { server.close(); } catch {}
+      for (const sock of sockets) sock.destroy();
+      server.close();
     },
   };
 
-  server.on('message', ([address, ...args]) => {
-    const send = (body) => reply.send(`/reply${address}`, JSON.stringify(body));
+  function handleMessage(sock, address, args) {
+    const send = (body) => writeMessage(sock, `/reply${address}`, [JSON.stringify(body)]);
     let m;
 
     if (address.endsWith('/connect')) {
@@ -59,7 +83,6 @@ function startFakeQlab() {
       return;
     }
     if (address === '/updates') return; // subscription — no reply
-    if (address === '/udpReplyPort') { fake.udpReplyPort = args[0]; return; }
     if (fake.connectMode !== 'ok') return; // unauthenticated: mute all cue replies
 
     if (address.endsWith(`/cue/${config.qlabMainCueList}/uniqueID`)) {
@@ -84,9 +107,27 @@ function startFakeQlab() {
       fake.confirmFired++;
       send({ status: 'ok' });
     }
+  }
+
+  const server = net.createServer((sock) => {
+    sockets.add(sock);
+    const decoder = new SlipDecoder();
+
+    sock.on('data', (chunk) => {
+      for (const frame of decoder.push(chunk)) {
+        let decoded;
+        try { decoded = fromBuffer(frame); } catch { continue; } // malformed frame — ignore
+        if (decoded.oscType !== 'message') continue;
+        handleMessage(sock, decoded.address, decoded.args.map(a => a.value));
+      }
+    });
+    sock.on('close', () => sockets.delete(sock));
+    sock.on('error', () => {});
   });
+
+  server.listen(PORT, '127.0.0.1');
 
   return fake;
 }
 
-module.exports = { startFakeQlab, SEND_PORT, RECV_PORT, MAIN_LIST_ID };
+module.exports = { startFakeQlab, PORT, CUE_PORT, MAIN_LIST_ID };
