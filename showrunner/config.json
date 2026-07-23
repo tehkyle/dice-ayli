@@ -9,8 +9,8 @@
   "qlabMainCueList": "MAIN",
   "castConfirmedCue": "CAST_CONFIRMED",
   "photosPathCue": "PHOTOS_PATH",
-  "photosDir": "/Volumes/AYLI Show Photos",
-  "qlabPhotosDir": "/Users/dacha/Documents/AYLI Show Photos",
+  "photosDir": "",
+  "qlabPhotosDir": "",
   "cameraHostname": "",
   "actors": [
     {
