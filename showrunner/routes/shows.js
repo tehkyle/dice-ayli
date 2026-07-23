@@ -8,8 +8,8 @@ const extractZip = require('extract-zip');
 const multer     = require('multer');
 const { getDb, nextId } = require('../db/database');
 const { sendCastToQLab, sendScenesToQLab, sendPhotosPathToQLab, setActiveShow, endShow } = require('../osc/qlabBridge');
-const { formatShow, getCameraUrl } = require('../utils');
-const { DATA_DIR } = require('../dataDir');
+const { formatShow, getCameraUrl, photoFolderName } = require('../utils');
+const { getPhotosDir } = require('../dataDir');
 
 const importUpload = multer({
   storage: multer.memoryStorage(),
@@ -127,7 +127,7 @@ router.post('/:id/cast', async (req, res) => {
     if (scenes && typeof scenes === 'object') {
       scenesOk = await sendScenesToQLab(scenes, scenesOrdered || {});
     }
-    const photosPathOk = await sendPhotosPathToQLab(showId);
+    const photosPathOk = await sendPhotosPathToQLab(show);
     qlabNotified = castResult.synced && scenesOk && photosPathOk;
   } catch (err) {
     console.error(`[OSC ERR] sendCastToQLab threw: ${err.message}`);
@@ -211,8 +211,9 @@ router.get('/export', (req, res) => {
   archive.pipe(res);
   archive.append(JSON.stringify(shows, null, 2), { name: 'history.json' });
   for (const show of shows) {
+    const folder = photoFolderName(show);
     for (const { filename } of show.photos) {
-      archive.file(path.join(DATA_DIR, 'photos', String(show.id), filename), { name: `photos/${show.id}/${filename}` });
+      archive.file(path.join(getPhotosDir(), folder, filename), { name: `photos/${folder}/${filename}` });
     }
   }
   archive.finalize();
@@ -243,9 +244,15 @@ router.post('/import', importUpload.single('archive'), async (req, res) => {
     const idMap       = importHistory(db, historyJson);
 
     for (const [oldId, newId] of idMap) {
-      const srcDir = path.join(extractDir, 'photos', String(oldId));
+      const entry = historyJson.find(e => e.id === oldId);
+      // Exports made before per-show folders were named by start time used
+      // the plain numeric show id — fall back to that for older archives.
+      let srcDir = path.join(extractDir, 'photos', photoFolderName(entry));
+      if (!fs.existsSync(srcDir)) srcDir = path.join(extractDir, 'photos', String(oldId));
       if (!fs.existsSync(srcDir)) continue;
-      const destDir = path.join(DATA_DIR, 'photos', String(newId));
+
+      const newShow = db.data.shows.find(s => s.id === newId);
+      const destDir = path.join(getPhotosDir(), photoFolderName(newShow));
       fs.mkdirSync(destDir, { recursive: true });
       fs.cpSync(srcDir, destDir, { recursive: true });
     }

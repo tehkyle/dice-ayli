@@ -32,6 +32,7 @@ export const api = {
   getSheetsConfig:  ()          => json('GET',    '/api/config/sheets'),
   saveSheetsConfig: (body)      => json('POST',   '/api/config/sheets', body),
   saveQlabConfig:   (body)      => json('POST',   '/api/config/qlab', body),
+  testPhotosDir:    (dir)       => json('POST',   '/api/config/photos/test', { dir }),
   saveGeneralConfig: (body)     => json('POST',   '/api/config/general', body),
   listSheets:       ()          => json('GET',    '/api/sheets/list'),
   getSheetTabs:     (id)        => json('GET',    `/api/sheets/${id}/tabs`),

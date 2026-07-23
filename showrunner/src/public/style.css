@@ -1279,6 +1279,21 @@ body.history-page {
   outline-offset: 2px;
 }
 
+.modal-input-row {
+  display: flex;
+  gap: 8px;
+}
+
+.modal-input-row .modal-input {
+  flex: 1;
+}
+
+.modal-input-row .btn {
+  flex-shrink: 0;
+  padding: 10px 16px;
+  font-size: 0.9rem;
+}
+
 .modal-footer {
   display: flex;
   align-items: center;

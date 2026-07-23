@@ -1,6 +1,6 @@
 {
   "rehearsalMode": false,
-  "qlabHost": "",
+  "qlabHost": "192.168.8.111",
   "qlabSendPort": "",
   "qlabReceivePort": "",
   "qlabPasscode": "5436",
@@ -9,6 +9,8 @@
   "qlabMainCueList": "MAIN",
   "castConfirmedCue": "CAST_CONFIRMED",
   "photosPathCue": "PHOTOS_PATH",
+  "photosDir": "/Volumes/AYLI Show Photos",
+  "qlabPhotosDir": "/Users/dacha/Documents/AYLI Show Photos",
   "cameraHostname": "",
   "actors": [
     {

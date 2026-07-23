@@ -2,8 +2,8 @@ const fs   = require('fs');
 const path = require('path');
 const EventEmitter = require('events');
 const { QLabTcpConnection, QLabTcpListener } = require('./tcpTransport');
-const { extractWorkspaceId } = require('../utils');
-const { DATA_DIR } = require('../dataDir');
+const { extractWorkspaceId, photoFolderName } = require('../utils');
+const { getQlabPhotosDir } = require('../dataDir');
 
 // ── Network config (config.json → .env → default) ──────────────────────────────
 const DEFAULT_HOST      = '127.0.0.1';
@@ -445,12 +445,12 @@ async function sendCastToQLab(castMap, { fireConfirm = true } = {}) {
 // QLab-side AppleScript (e.g. a Script cue at the finale) can read it to know
 // where to find that performance's uploaded photos. No-op if photosPathCue isn't
 // configured — this is opt-in per-production, not every workspace has the cue.
-async function sendPhotosPathToQLab(showId) {
+async function sendPhotosPathToQLab(show) {
   const { photosPathCue } = loadConfig();
   if (!photosPathCue) return true;
 
   await ensureConnected();
-  const photosPath = path.join(DATA_DIR, 'photos', String(showId));
+  const photosPath = path.join(getQlabPhotosDir(), photoFolderName(show));
   const addr = cueAddress(photosPathCue, 'notes');
   logOut(`${addr} "${photosPath}"`);
   try {

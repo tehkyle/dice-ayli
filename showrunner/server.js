@@ -7,7 +7,7 @@ try {
 
 const express = require('express');
 
-const { DATA_DIR } = require('./dataDir');
+const { getPhotosDir } = require('./dataDir');
 const { getDb } = require('./db/database');
 const { startReceiver, setActiveShow } = require('./osc/qlabBridge');
 const showsRouter  = require('./routes/shows');
@@ -24,7 +24,9 @@ const app = express();
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
-app.use('/photos', express.static(path.join(DATA_DIR, 'photos')));
+// Re-resolves getPhotosDir() on every request (instead of a fixed express.static
+// root) so a Settings change to the photos folder takes effect without a restart.
+app.use('/photos', (req, res, next) => express.static(getPhotosDir())(req, res, next));
 
 app.get('/history', (_req, res) => res.sendFile(path.join(__dirname, 'public/index.html')));
 app.get('/camera',  (_req, res) => res.sendFile(path.join(__dirname, 'public/index.html')));

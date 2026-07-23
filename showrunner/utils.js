@@ -45,6 +45,18 @@ function extractWorkspaceId(body) {
   return null;
 }
 
+// Stable per-show photo folder name, derived from when the show started
+// rather than its numeric db id — ids restart from 1 after history is
+// cleared, which would otherwise let a new show's photos land in (and
+// collide with) an old show's leftover folder on disk. The show's own id
+// is appended only as a tiebreaker for two shows starting the same second
+// (automated tests; a human clicking "Begin Show" can't do this in practice).
+function photoFolderName(show) {
+  const started = show.started_at ? new Date(show.started_at) : new Date();
+  const slug = started.toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15);
+  return `${slug}-${show.id}`;
+}
+
 // Finds this machine's LAN-reachable IPv4 address so phones on the same WiFi can hit it.
 // Falls back to localhost if no external interface is found (e.g. offline dev).
 function getLanIp() {
@@ -65,4 +77,4 @@ function getCameraUrl() {
   return `http://${host}:${port}/camera`;
 }
 
-module.exports = { buildOAuthClient, createOAuth2Client, formatShow, extractWorkspaceId, getLanIp, getCameraUrl };
+module.exports = { buildOAuthClient, createOAuth2Client, formatShow, extractWorkspaceId, getLanIp, getCameraUrl, photoFolderName };

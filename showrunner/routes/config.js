@@ -40,6 +40,9 @@ router.post('/general', (req, res) => {
   const config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
 
   if ('rehearsalMode' in body) config.rehearsalMode = !!body.rehearsalMode;
+  for (const key of ['photosDir', 'qlabPhotosDir']) {
+    if (key in body) config[key] = String(body[key] ?? '').trim();
+  }
 
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf8');
   res.json({ success: true });
@@ -64,6 +67,25 @@ router.post('/qlab', (req, res) => {
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf8');
   applyNetworkConfig();
   res.json({ success: true });
+});
+
+// POST /api/config/photos/test — write+read+delete a marker file in a
+// candidate photos folder, so a dropped network mount (or a typo'd path)
+// surfaces immediately in Settings instead of silently at show time.
+router.post('/photos/test', (req, res) => {
+  const dir = String(req.body?.dir || '').trim();
+  if (!dir) return res.status(400).json({ ok: false, error: 'No folder given' });
+
+  const marker = path.join(dir, '.showrunner-write-test');
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(marker, String(Date.now()));
+    fs.readFileSync(marker);
+    fs.unlinkSync(marker);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ ok: false, error: err.message });
+  }
 });
 
 module.exports = router;

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, utilityProcess, dialog, globalShortcut, shell } = require('electron');
+const { app, BrowserWindow, utilityProcess, dialog, globalShortcut, shell, ipcMain } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs   = require('fs');
@@ -105,6 +105,7 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       backgroundThrottling: false,
+      preload: path.join(__dirname, 'preload.js'),
     },
   });
 
@@ -142,6 +143,15 @@ function setupUpdater() {
     autoUpdater.checkForUpdates().catch(err => log(`[Updater] Check failed: ${err.message}`));
   }, UPDATE_CHECK_DELAY_MS);
 }
+
+// Native "choose folder" dialog for the Settings photos-folder field — picking
+// a share by browsing avoids the operator hand-typing (and mistyping) a mount path.
+ipcMain.handle('choose-folder', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openDirectory', 'createDirectory'],
+  });
+  return result.canceled ? null : result.filePaths[0];
+});
 
 app.whenReady().then(() => {
   migrateLegacyData();

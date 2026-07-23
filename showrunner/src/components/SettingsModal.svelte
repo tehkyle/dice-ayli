@@ -8,9 +8,17 @@
 
   // ── General tab ──────────────────────────────────────────────────────────
   let rehearsalMode = $state(false);
+  let photosDir     = $state('');
+  let qlabPhotosDir = $state('');
   let generalStatus = $state('');
   let generalError  = $state(false);
   let generalSaving = $state(false);
+
+  let photosTestStatus = $state('');
+  let photosTestError  = $state(false);
+  let photosTesting    = $state(false);
+
+  const hasFolderPicker = typeof window !== 'undefined' && !!window.electronAPI?.chooseFolder;
 
   async function loadGeneralTab() {
     generalStatus = '';
@@ -18,6 +26,8 @@
     try {
       const cfg = await api.getConfig();
       rehearsalMode = !!cfg.rehearsalMode;
+      photosDir     = cfg.photosDir ?? '';
+      qlabPhotosDir = cfg.qlabPhotosDir ?? '';
     } catch {}
   }
 
@@ -26,7 +36,7 @@
     generalError  = false;
     generalStatus = 'Saving…';
     try {
-      await api.saveGeneralConfig({ rehearsalMode });
+      await api.saveGeneralConfig({ rehearsalMode, photosDir, qlabPhotosDir });
       settingsData.rehearsalMode = rehearsalMode;
       generalStatus = 'Saved!';
       setTimeout(() => { generalStatus = ''; }, 2500);
@@ -35,6 +45,27 @@
       generalStatus = 'Save failed.';
     } finally {
       generalSaving = false;
+    }
+  }
+
+  async function browsePhotosDir() {
+    const dir = await window.electronAPI.chooseFolder();
+    if (dir) photosDir = dir;
+  }
+
+  async function testPhotosDir() {
+    photosTesting    = true;
+    photosTestError  = false;
+    photosTestStatus = 'Testing…';
+    try {
+      const res = await api.testPhotosDir(photosDir);
+      photosTestError  = !res.ok;
+      photosTestStatus = res.ok ? 'Folder is writable ✓' : `Failed: ${res.error}`;
+    } catch {
+      photosTestError  = true;
+      photosTestStatus = 'Network error.';
+    } finally {
+      photosTesting = false;
     }
   }
 
@@ -271,6 +302,34 @@
             <input type="checkbox" bind:checked={rehearsalMode} />
             Rehearsal mode
           </label>
+
+          <p class="modal-desc">
+            Only needed when QLab runs on a different machine than Showrunner. Share a
+            folder from the QLab machine, mount it here, and point both fields below at it —
+            the first is the path this machine uses to save photos, the second is that same
+            folder as QLab's own machine sees it.
+          </p>
+          <div class="modal-field">
+            <label class="modal-label" for="photos-dir">Photos folder (this machine)</label>
+            <div class="modal-input-row">
+              <input id="photos-dir" class="modal-input" type="text" placeholder="Default: app data folder" bind:value={photosDir} />
+              {#if hasFolderPicker}
+                <button type="button" class="btn" onclick={browsePhotosDir}>Browse…</button>
+              {/if}
+            </div>
+            {#if photosDir}
+              <div class="modal-checkbox-row">
+                <button type="button" class="btn-link" disabled={photosTesting} onclick={testPhotosDir}>Test this folder</button>
+                {#if photosTestStatus}
+                  <span class="modal-save-status {photosTestError ? 'error' : ''}">{photosTestStatus}</span>
+                {/if}
+              </div>
+            {/if}
+          </div>
+          <div class="modal-field">
+            <label class="modal-label" for="qlab-photos-dir">Photos folder (as QLab sees it)</label>
+            <input id="qlab-photos-dir" class="modal-input" type="text" placeholder="Same as above" bind:value={qlabPhotosDir} />
+          </div>
 
         {:else if tab === 'sheets'}
 

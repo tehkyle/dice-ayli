@@ -8,10 +8,9 @@ const archiver = require('archiver');
 
 const { getDb, nextId } = require('../db/database');
 const { broadcast } = require('./events');
-const { DATA_DIR } = require('../dataDir');
-const { getCameraUrl } = require('../utils');
+const { getPhotosDir } = require('../dataDir');
+const { getCameraUrl, photoFolderName } = require('../utils');
 
-const PHOTOS_DIR = path.join(DATA_DIR, 'photos');
 const upload = multer({
   storage: multer.memoryStorage(),
   limits:  { fileSize: 8 * 1024 * 1024 },
@@ -66,7 +65,7 @@ router.post('/upload', upload.single('photo'), (req, res) => {
     return res.status(400).json({ error: `Unsupported photo format (${req.file.mimetype})` });
   }
 
-  const dir      = path.join(PHOTOS_DIR, String(showId));
+  const dir      = path.join(getPhotosDir(), photoFolderName(show));
   const filename = `${timestampSlug()}_${crypto.randomBytes(2).toString('hex')}.${ext}`;
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, filename), req.file.buffer);
@@ -88,9 +87,12 @@ router.delete('/:show_id/:filename', (req, res) => {
   const idx = db.data.photos.findIndex(p => p.show_id === showId && p.filename === filename);
   if (idx === -1) return res.status(404).json({ error: 'Photo not found' });
 
-  try {
-    fs.unlinkSync(path.join(PHOTOS_DIR, String(showId), filename));
-  } catch {}
+  const show = db.data.shows.find(s => s.id === showId);
+  if (show) {
+    try {
+      fs.unlinkSync(path.join(getPhotosDir(), photoFolderName(show), filename));
+    } catch {}
+  }
 
   db.data.photos.splice(idx, 1);
   db.write();
@@ -118,8 +120,9 @@ router.get('/:show_id/zip', (req, res) => {
   const archive = archiver('zip');
   archive.on('error', err => res.status(500).end(err.message));
   archive.pipe(res);
+  const dir = path.join(getPhotosDir(), photoFolderName(show ?? { id: showId }));
   for (const { filename } of photos) {
-    archive.file(path.join(PHOTOS_DIR, String(showId), filename), { name: filename });
+    archive.file(path.join(dir, filename), { name: filename });
   }
   archive.finalize();
 });
