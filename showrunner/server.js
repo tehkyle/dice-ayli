@@ -9,6 +9,7 @@ const express = require('express');
 
 const { getPhotosDir } = require('./dataDir');
 const { getDb } = require('./db/database');
+const { photoFolderName } = require('./utils');
 const { startReceiver, setActiveShow } = require('./osc/qlabBridge');
 const showsRouter  = require('./routes/shows');
 const configRouter = require('./routes/config');
@@ -24,9 +25,24 @@ const app = express();
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
-// Re-resolves getPhotosDir() on every request (instead of a fixed express.static
-// root) so a Settings change to the photos folder takes effect without a restart.
-app.use('/photos', (req, res, next) => express.static(getPhotosDir())(req, res, next));
+
+// Photo URLs stay id-based (/photos/:showId/:filename) even though the
+// on-disk folder is named by the show's start time (see photoFolderName) —
+// this indirection is what keeps gallery links stable regardless of that
+// naming scheme, and re-reads getPhotosDir() per request so a Settings
+// change takes effect without a restart.
+app.get('/photos/:showId/:filename', (req, res) => {
+  const showId   = parseInt(req.params.showId, 10);
+  const filename = req.params.filename;
+  if (!/^[\w.-]+$/.test(filename)) return res.status(400).end();
+
+  const show = getDb().data.shows.find(s => s.id === showId);
+  if (!show) return res.status(404).end();
+
+  res.sendFile(path.join(getPhotosDir(), photoFolderName(show), filename), (err) => {
+    if (err && !res.headersSent) res.status(404).end();
+  });
+});
 
 app.get('/history', (_req, res) => res.sendFile(path.join(__dirname, 'public/index.html')));
 app.get('/camera',  (_req, res) => res.sendFile(path.join(__dirname, 'public/index.html')));

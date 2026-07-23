@@ -151,7 +151,7 @@
             <div class="photo-status warn">
               ● PHOTO UPLOAD DISABLED — {photosReceived} photo{photosReceived === 1 ? '' : 's'} saved
             </div>
-            <div class="photo-folder-path">photos/{showData.id}/</div>
+            <div class="photo-folder-path">Saved to the configured photos folder</div>
           {/if}
 
           {#if error}
