@@ -75,14 +75,18 @@ async function appendShowToSheet(show, performanceNumber, castAssignments, scene
   const castColumns = (config.characterTracks || []).map(t => castMap[t.id] || '');
 
   // Duration as a Sheets time serial (for column formatting + AVERAGE formulas)
-  // or as a human-readable m:ss string for the clipboard TSV fallback.
+  // or as an h:mm:ss string for the clipboard TSV fallback. Plain "m:ss" text
+  // (e.g. "3:59") left to Sheets' paste parser gets read as h:mm, so a 3m59s
+  // scene would show up as 3 hours 59 minutes — the full h:mm:ss form parses
+  // unambiguously.
   function durationCell(entry, { tsv = false } = {}) {
     if (!entry || entry.duration_ms == null) return '';
     if (tsv) {
       const totalSec = Math.round(entry.duration_ms / 1000);
-      const m = Math.floor(totalSec / 60);
+      const h = Math.floor(totalSec / 3600);
+      const m = Math.floor((totalSec % 3600) / 60);
       const s = totalSec % 60;
-      return `${m}:${String(s).padStart(2, '0')}`;
+      return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
     }
     return entry.duration_ms / 86400000;
   }

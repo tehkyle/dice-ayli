@@ -7,7 +7,7 @@
   import { progressData, resetProgress } from '../stores/progress.svelte.js';
   import { api } from '../lib/api.js';
   import { getSocket } from '../lib/socket.js';
-  import { formatDate, formatDuration, formatDurationReport, toIsoDate } from '../lib/format.js';
+  import { formatDate, formatDuration, formatDurationReport, formatDurationTsv, toIsoDate } from '../lib/format.js';
   import CastSummaryRow from '../components/CastSummaryRow.svelte';
   import HistoryGalleryModal from '../components/HistoryGalleryModal.svelte';
   import { openHistoryGallery } from '../stores/historyGallery.svelte.js';
@@ -29,9 +29,10 @@
     return formatDuration(new Date(first.time).getTime() - new Date(showData.startTime).getTime());
   });
 
-  let spreadsheetId = $state(null);
-  let sheetsError   = $state(false);
-  let copied        = $state(false);
+  let spreadsheetId   = $state(null);
+  let showrunnerEmail = $state('');
+  let sheetsError     = $state(false);
+  let copied          = $state(false);
 
   // Builds a tab-separated row matching the Google Sheets column order.
   // Used for the clipboard button and as fallback when the Sheets write fails.
@@ -58,7 +59,7 @@
 
     const first = progressData.scenesPlayed[0];
     const introDicing = (showData.startTime && first)
-      ? formatDurationReport(new Date(first.time).getTime() - new Date(showData.startTime).getTime())
+      ? formatDurationTsv(new Date(first.time).getTime() - new Date(showData.startTime).getTime())
       : '';
 
     const sceneCols = [];
@@ -67,21 +68,22 @@
       sceneCols.push(actEntries.map(e => e.scene).join(' → '));
       for (const sceneName of act.scenes) {
         const entry = sceneMap[sceneName];
-        sceneCols.push(entry?.duration ? formatDurationReport(entry.duration) : '');
+        sceneCols.push(entry?.duration ? formatDurationTsv(entry.duration) : '');
       }
     }
     const staticCols = configData.staticScenes.map(name => {
       const entry = sceneMap[name];
-      return entry?.duration ? formatDurationReport(entry.duration) : '';
+      return entry?.duration ? formatDurationTsv(entry.duration) : '';
     });
 
-    return [date, start, run, ...castCols, introDicing, ...sceneCols, ...staticCols].join('\t');
+    return [date, start, run, showrunnerEmail, ...castCols, introDicing, ...sceneCols, ...staticCols].join('\t');
   });
 
   onMount(async () => {
     try {
       const cfg = await api.getSheetsConfig();
-      spreadsheetId = cfg.spreadsheetId ?? null;
+      spreadsheetId   = cfg.spreadsheetId ?? null;
+      showrunnerEmail = cfg.userEmail ?? '';
     } catch {}
 
     const socket = getSocket();

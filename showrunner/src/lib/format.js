@@ -26,13 +26,25 @@ export function formatDuration(ms) {
   return m > 0 ? `${m}m ${s}s` : `${s}s`;
 }
 
-// m:ss — for reports, spreadsheet TSV output, and history cards
+// m:ss — for on-screen reports and history cards
 export function formatDurationReport(ms) {
   if (ms == null || ms < 0) return '—';
   const totalSec = Math.round(ms / 1000);
   const m = Math.floor(totalSec / 60);
   const s = totalSec % 60;
   return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+// h:mm:ss — for TSV/clipboard duration cells. Plain "m:ss" text (e.g. "3:59")
+// left to Sheets' own paste parser gets read as h:mm, so a 3m59s scene shows
+// up as 3 hours 59 minutes. The full h:mm:ss form parses unambiguously.
+export function formatDurationTsv(ms) {
+  if (ms == null || ms < 0) return '';
+  const totalSec = Math.round(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
 export function actorImageUrl(image) {
