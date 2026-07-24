@@ -181,13 +181,22 @@ async function appendShowToSheet(show, performanceNumber, castAssignments, scene
 
     console.log(`[Sheets] ${timestamp()} Appending row for show ${show.id} to "${sheetTabName}": ${row.join(' | ')}`);
 
-    await sheets.spreadsheets.values.append({
+    const appendResult = await sheets.spreadsheets.values.append({
       spreadsheetId,
       range:            `${sheetTabName}!A1`,
       valueInputOption: 'USER_ENTERED',
       insertDataOption: 'INSERT_ROWS',
       requestBody:      { values: [row] },
     });
+
+    const updatedRange = appendResult.data.updates?.updatedRange;
+    if (updatedRange) {
+      try {
+        await copyPreviousRowFormat(sheets, spreadsheetId, sheetTabName, updatedRange, expectedHeader.length);
+      } catch (err) {
+        console.warn(`[Sheets] ${timestamp()} Could not copy previous row's formatting: ${err.message}`);
+      }
+    }
 
     console.log(`[Sheets] ${timestamp()} Row appended successfully`);
     return { success: true, tsvRow };
@@ -198,17 +207,21 @@ async function appendShowToSheet(show, performanceNumber, castAssignments, scene
   }
 }
 
+async function getSheetId(sheets, spreadsheetId, sheetTabName) {
+  const meta = await sheets.spreadsheets.get({
+    spreadsheetId,
+    fields: 'sheets.properties',
+  });
+  return meta.data.sheets.find(s => s.properties.title === sheetTabName)?.properties.sheetId ?? null;
+}
+
 /**
  * Set number formats on time/duration columns so values display correctly
  * without the user needing to manually format them.
  */
 async function applyColumnFormats(sheets, spreadsheetId, sheetTabName, config) {
   try {
-    const meta = await sheets.spreadsheets.get({
-      spreadsheetId,
-      fields: 'sheets.properties',
-    });
-    const sheetId = meta.data.sheets.find(s => s.properties.title === sheetTabName)?.properties.sheetId;
+    const sheetId = await getSheetId(sheets, spreadsheetId, sheetTabName);
     if (sheetId == null) return;
 
     let col = 0;
@@ -246,6 +259,37 @@ async function applyColumnFormats(sheets, spreadsheetId, sheetTabName, config) {
   } catch (err) {
     console.warn(`[Sheets] ${timestamp()} Could not apply column formats: ${err.message}`);
   }
+}
+
+/**
+ * Copy the previous row's cell formatting onto a just-appended row.
+ *
+ * Column-wide formats (applyColumnFormats) only reach rows that already
+ * existed in the sheet's grid at the time they were applied. Once a sheet
+ * grows past its original row count, Sheets auto-expands the grid and the
+ * new rows start out with no format at all — so the h:mm:ss duration values
+ * we write get auto-detected as a 12-hour clock "Time" instead of showing as
+ * a duration. Copying the row above forward on every append sidesteps that.
+ */
+async function copyPreviousRowFormat(sheets, spreadsheetId, sheetTabName, updatedRange, columnCount) {
+  const newRow = Number(/![A-Z]+(\d+):/.exec(updatedRange)?.[1]);
+  if (!newRow || newRow < 2) return; // row 1 is the header — nothing above it to copy
+
+  const sheetId = await getSheetId(sheets, spreadsheetId, sheetTabName);
+  if (sheetId == null) return;
+
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      requests: [{
+        copyPaste: {
+          source:      { sheetId, startRowIndex: newRow - 2, endRowIndex: newRow - 1, startColumnIndex: 0, endColumnIndex: columnCount },
+          destination: { sheetId, startRowIndex: newRow - 1, endRowIndex: newRow,     startColumnIndex: 0, endColumnIndex: columnCount },
+          pasteType: 'PASTE_FORMAT',
+        },
+      }],
+    },
+  });
 }
 
 module.exports = { appendShowToSheet, buildHeaderRow };
